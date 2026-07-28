@@ -10,8 +10,8 @@ export const isAdminUser = (user) => {
   return ADMIN_DISCORD_IDS.includes(user.id.toString());
 };
 
-// Default Discord OAuth Client ID (Can be overridden by user or env)
-export const DEFAULT_DISCORD_CLIENT_ID = '1399863486375039016';
+// User's Official Discord Application Credentials
+export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
   const redirectUri = window.location.origin + window.location.pathname;
