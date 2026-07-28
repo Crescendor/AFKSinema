@@ -14,12 +14,14 @@ const ROWS = [
 export function CinemaAuditorium({
   seatedUsers,
   userSnacks = {},
+  vipUsers = {},
   currentUser,
   onSelectSeat,
   onOpenLoginModal,
   onOpenAdminModal
 }) {
   const isAdmin = isAdminUser(currentUser);
+  const isMyVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
   const handleSeatClick = (rowId, seatNum, isVip) => {
     const seatCode = `${rowId}${seatNum}`;
@@ -27,6 +29,12 @@ export function CinemaAuditorium({
 
     if (isAdmin && occupant && occupant.id !== currentUser.id) {
       onOpenAdminModal(occupant, seatCode);
+      return;
+    }
+
+    // VIP Seat Restriction: Row A is VIP Only!
+    if (isVip && !isMyVip) {
+      alert('⭐ VIP KOLTUK:\nSıra A koltukları yalnızca VIP Üyelere ve Adminlere özeldir.\nAdmininizden VIP üyelik talep edebilirsiniz!');
       return;
     }
 
@@ -64,7 +72,7 @@ export function CinemaAuditorium({
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Crown size={14} color="var(--accent-gold)" />
-          <span>VIP Kadife Koltuklar: Sıra A</span>
+          <span>VIP Kadife Koltuklar: Sıra A (Sadece VIP)</span>
         </div>
       </div>
 
@@ -99,7 +107,7 @@ export function CinemaAuditorium({
                   {/* Left & Right Buffet Snack Items beside Avatar */}
                   {occupant && (
                     <>
-                      {snacks.left && (
+                      {snacks.left && snacks.left.icon && (
                         <div style={{
                           position: 'absolute',
                           left: '-14px',
@@ -108,7 +116,7 @@ export function CinemaAuditorium({
                           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
                           zIndex: 15
                         }}>
-                          {snacks.left}
+                          {snacks.left.icon}
                         </div>
                       )}
 
@@ -116,7 +124,7 @@ export function CinemaAuditorium({
                         <img src={occupant.avatar} alt={occupant.username} className="seat-avatar-img" />
                       </div>
 
-                      {snacks.right && (
+                      {snacks.right && snacks.right.icon && (
                         <div style={{
                           position: 'absolute',
                           right: '-14px',
@@ -125,7 +133,7 @@ export function CinemaAuditorium({
                           filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
                           zIndex: 15
                         }}>
-                          {snacks.right}
+                          {snacks.right.icon}
                         </div>
                       )}
                     </>
@@ -139,26 +147,28 @@ export function CinemaAuditorium({
                       <div>
                         <div style={{ fontWeight: '700', color: isMySeat ? '#34d399' : 'white', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           {isMySeat ? '📍 Sizin Koltuğunuz' : occupant.username}
-                          {occupant.badge && <span style={{ fontSize: '0.65rem', color: 'var(--discord-yellow)' }}>{occupant.badge}</span>}
+                          {(vipUsers[occupant.id] || isAdmin) && <span style={{ fontSize: '0.65rem', background: 'var(--accent-gold)', color: 'black', padding: '1px 4px', borderRadius: '4px', fontWeight: 800 }}>⭐ VIP</span>}
                         </div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           Koltuk {seatCode} {isVip ? '• VIP Lounge' : ''}
                         </div>
                         {(snacks.left || snacks.right) && (
                           <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
-                            🍿 İkramlar: {snacks.left || ''} {snacks.right || ''}
+                            🍿 İkramlar: {snacks.left?.icon || ''} {snacks.right?.icon || ''}
                           </div>
                         )}
                         {isAdmin && !isMySeat && (
                           <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', marginTop: '2px', fontWeight: 700 }}>
-                            👑 Tıkla: Koltuk Değiştir / At
+                            👑 Tıkla: Yönet (VIP/Koltuk/At)
                           </div>
                         )}
                       </div>
                     ) : (
                       <div>
-                        <div style={{ fontWeight: '700' }}>Koltuk {seatCode} (Boş)</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--cinema-red)' }}>Oturmak için tıkla</div>
+                        <div style={{ fontWeight: '700' }}>Koltuk {seatCode} {isVip ? '⭐ (VIP Özel)' : '(Boş)'}</div>
+                        <div style={{ fontSize: '0.7rem', color: isVip ? 'var(--accent-gold)' : 'var(--cinema-red)' }}>
+                          {isVip ? 'VIP Üyelere Özel' : 'Oturmak için tıkla'}
+                        </div>
                       </div>
                     )}
                   </div>

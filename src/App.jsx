@@ -6,7 +6,7 @@ import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { AdminControlsModal } from './components/AdminControlsModal';
 import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, ShoppingBag, Coins, Crown } from 'lucide-react';
+import { LogIn, ShoppingBag, Coins, Star } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -26,6 +26,9 @@ const INITIAL_BUFFET_ITEMS = [
   { id: 'b6', name: 'VIP Altın Mısır', price: 100, icon: '👑' }
 ];
 
+// Snack Expiry Duration: 20 Minutes (20 * 60 * 1000 ms)
+const SNACK_EXPIRY_MS = 20 * 60 * 1000;
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [tempDiscordUser, setTempDiscordUser] = useState(null);
@@ -44,9 +47,10 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Credit System & Snacks State
+  // Economy, VIP & Snacks State
   const [userCredits, setUserCredits] = useState({}); // { [userId]: number }
-  const [userSnacks, setUserSnacks] = useState({}); // { [userId]: { left: '🍿', right: '🥤' } }
+  const [vipUsers, setVipUsers] = useState({}); // { [userId]: boolean }
+  const [userSnacks, setUserSnacks] = useState({}); // { [userId]: { left: { icon, expireTime }, right: { icon, expireTime } } }
   const [buffetItems, setBuffetItems] = useState(INITIAL_BUFFET_ITEMS);
 
   // Seat Change Anti-Spam Tracker & Ban List
@@ -54,19 +58,25 @@ export default function App() {
   const [bannedUsers, setBannedUsers] = useState({});
 
   const isAdmin = isAdminUser(currentUser);
+  const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // 10-Minute Loyalty Credit Interval (+20 Credits every 10 Mins)
+  // 10-Minute Loyalty Credit Interval (+20 for Standard, +50 for VIP)
   useEffect(() => {
     const creditTimer = setInterval(() => {
       if (currentUser && !isAdmin) {
+        const isUserVip = vipUsers[currentUser.id];
+        const grantReward = isUserVip ? 50 : 20;
+
         setUserCredits(prev => {
-          const currentBal = prev[currentUser.id] || 50; // Starting credit 50
-          const updatedBal = currentBal + 20;
+          const currentBal = prev[currentUser.id] || 50;
+          const updatedBal = currentBal + grantReward;
           
           setMessages(prevMsgs => [...prevMsgs, {
             id: 'sys_' + Date.now(),
             type: 'system',
-            text: `🪙 SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+            text: isUserVip
+              ? `⭐ VIP SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +50 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+              : `🪙 SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
           }]);
 
           return { ...prev, [currentUser.id]: updatedBal };
@@ -75,7 +85,35 @@ export default function App() {
     }, 10 * 60 * 1000);
 
     return () => clearInterval(creditTimer);
-  }, [currentUser, isAdmin]);
+  }, [currentUser, isAdmin, vipUsers]);
+
+  // 20-Minute Snack Auto-Expiry Cleanup Interval
+  useEffect(() => {
+    const expiryInterval = setInterval(() => {
+      const now = Date.now();
+      setUserSnacks(prev => {
+        let changed = false;
+        const updated = { ...prev };
+
+        Object.entries(updated).forEach(([userId, slots]) => {
+          const newSlots = { ...slots };
+          if (newSlots.left && now > newSlots.left.expireTime) {
+            newSlots.left = null;
+            changed = true;
+          }
+          if (newSlots.right && now > newSlots.right.expireTime) {
+            newSlots.right = null;
+            changed = true;
+          }
+          updated[userId] = newSlots;
+        });
+
+        return changed ? updated : prev;
+      });
+    }, 15000); // Check every 15s
+
+    return () => clearInterval(expiryInterval);
+  }, []);
 
   // Check URL Search Params for ?code= OR Hash for #access_token=
   useEffect(() => {
@@ -166,7 +204,6 @@ export default function App() {
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
 
-    // Initial 50 credits for new user
     if (!userCredits[finalUser.id]) {
       setUserCredits(prev => ({ ...prev, [finalUser.id]: 50 }));
     }
@@ -192,7 +229,7 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Buffet Snack Purchase Handler
+  // Buffet Snack Purchase Handler (with 20-minute expiry)
   const handleBuySnack = (userId, item, slot) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -201,13 +238,15 @@ export default function App() {
       }));
     }
 
+    const expireTime = Date.now() + SNACK_EXPIRY_MS;
+
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
       return {
         ...prev,
         [userId]: {
           ...existing,
-          [slot]: item.icon
+          [slot]: { icon: item.icon, expireTime }
         }
       };
     });
@@ -215,8 +254,39 @@ export default function App() {
     setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
       type: 'system',
-      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı!`
+      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı! (20 Dakika Süreli)`
     }]);
+  };
+
+  // Popcorn Eating Consumption Handler
+  const handleConsumePopcorn = () => {
+    if (!currentUser) return;
+    const userId = currentUser.id;
+
+    setUserSnacks(prev => {
+      const existing = prev[userId] || { left: null, right: null };
+      let newLeft = existing.left;
+      let newRight = existing.right;
+
+      if (existing.left && (existing.left.icon === '🍿' || existing.left.icon === '👑')) {
+        newLeft = null;
+      } else if (existing.right && (existing.right.icon === '🍿' || existing.right.icon === '👑')) {
+        newRight = null;
+      }
+
+      return {
+        ...prev,
+        [userId]: { left: newLeft, right: newRight }
+      };
+    });
+  };
+
+  // Admin VIP Toggle
+  const handleToggleVip = (userId) => {
+    setVipUsers(prev => ({
+      ...prev,
+      [userId]: !prev[userId]
+    }));
   };
 
   // Admin Grant Credits
@@ -227,7 +297,6 @@ export default function App() {
     }));
   };
 
-  // Admin Buffet Item Handlers
   const handleAddBuffetItem = (item) => {
     setBuffetItems(prev => [...prev, item]);
   };
@@ -341,6 +410,7 @@ export default function App() {
 
   const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
   const currentCreditBalance = currentUser ? (isAdmin ? '∞' : (userCredits[currentUser.id] || 50)) : 0;
+  const mySnacks = currentUser ? (userSnacks[currentUser.id] || {}) : {};
 
   return (
     <div className={`app-container ${lightsDimmed ? 'lights-dimmed' : ''}`}>
@@ -389,8 +459,8 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                background: 'rgba(225, 29, 72, 0.15)',
-                border: '1px solid rgba(225, 29, 72, 0.4)',
+                background: isVip ? 'rgba(251, 191, 36, 0.18)' : 'rgba(225, 29, 72, 0.15)',
+                border: `1px solid ${isVip ? 'var(--accent-gold)' : 'rgba(225, 29, 72, 0.4)'}`,
                 padding: '4px 12px',
                 borderRadius: '30px',
                 cursor: 'pointer'
@@ -398,9 +468,9 @@ export default function App() {
             >
               <img src={currentUser.avatar} alt={currentUser.username} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{currentUser.username}</span>
-              {isAdmin && (
+              {isVip && (
                 <span style={{ fontSize: '0.7rem', background: 'var(--accent-gold)', color: 'black', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
-                  👑 ADMIN
+                  {isAdmin ? '👑 ADMIN' : '⭐ VIP'}
                 </span>
               )}
             </div>
@@ -427,6 +497,7 @@ export default function App() {
           <CinemaAuditorium
             seatedUsers={seatedUsers}
             userSnacks={userSnacks}
+            vipUsers={vipUsers}
             currentUser={currentUser}
             onSelectSeat={handleSelectSeat}
             onOpenLoginModal={(seat) => { setTargetSeatCode(seat); setIsLoginModalOpen(true); }}
@@ -437,6 +508,8 @@ export default function App() {
             activeReactions={activeReactions}
             onTriggerReaction={handleTriggerReaction}
             mySeatCode={Object.keys(seatedUsers).find(k => seatedUsers[k].id === currentUser?.id)}
+            mySnacks={mySnacks}
+            onConsumePopcorn={handleConsumePopcorn}
           />
         </main>
 
@@ -476,7 +549,7 @@ export default function App() {
         isAdmin={isAdmin}
       />
 
-      {/* Admin Action Modal for User Management & Relocation */}
+      {/* Admin Action Modal */}
       <AdminControlsModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}
@@ -486,6 +559,8 @@ export default function App() {
         onMoveUser={handleAdminMoveUser}
         onKickUser={handleAdminKickUser}
         onGrantCredits={handleGrantCredits}
+        onToggleVip={handleToggleVip}
+        isTargetVip={adminModalUser && (vipUsers[adminModalUser.id] || isAdminUser(adminModalUser))}
       />
     </div>
   );

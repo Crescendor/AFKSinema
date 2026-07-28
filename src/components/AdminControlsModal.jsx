@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, UserX, ArrowRightLeft, Coins, Ban, Check, X } from 'lucide-react';
+import { Shield, UserX, ArrowRightLeft, Coins, Ban, Star, Check, X } from 'lucide-react';
 
 export function AdminControlsModal({
   isOpen,
@@ -9,7 +9,9 @@ export function AdminControlsModal({
   availableSeats,
   onMoveUser,
   onKickUser,
-  onGrantCredits
+  onGrantCredits,
+  onToggleVip,
+  isTargetVip
 }) {
   const [selectedNewSeat, setSelectedNewSeat] = useState('');
   const [kickDuration, setKickDuration] = useState('5');
@@ -40,6 +42,12 @@ export function AdminControlsModal({
     onClose();
   };
 
+  const handleToggleVipClick = () => {
+    onToggleVip(targetUser.id);
+    alert(`⭐ ${targetUser.username} kullanıcısının VIP durumu ${isTargetVip ? 'kaldırıldı' : 'aktifleştirildi'}!`);
+    onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
@@ -48,8 +56,9 @@ export function AdminControlsModal({
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <img src={targetUser.avatar} alt={targetUser.username} style={{ width: '40px', height: '40px', borderRadius: '50%', border: '2px solid var(--accent-gold)' }} />
             <div>
-              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800 }}>
+              <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '6px' }}>
                 {targetUser.username}
+                {isTargetVip && <span style={{ fontSize: '0.65rem', background: 'var(--accent-gold)', color: 'black', padding: '1px 6px', borderRadius: '4px' }}>⭐ VIP</span>}
               </h3>
               <span style={{ fontSize: '0.75rem', color: 'var(--cinema-red)' }}>
                 Koltuk: {currentSeatCode} • {targetUser.role || 'İzleyici'}
@@ -57,6 +66,30 @@ export function AdminControlsModal({
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={18} /></button>
+        </div>
+
+        {/* Section 0: Toggle VIP Membership */}
+        <div style={{ background: 'rgba(251, 191, 36, 0.12)', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Star size={16} /> VIP Üyelik Durumu
+            </div>
+            <button
+              onClick={handleToggleVipClick}
+              style={{
+                background: isTargetVip ? '#ef4444' : 'var(--accent-gold)',
+                color: isTargetVip ? 'white' : 'black',
+                border: 'none',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontSize: '0.78rem',
+                fontWeight: 800,
+                cursor: 'pointer'
+              }}
+            >
+              {isTargetVip ? 'VIP Kaldır' : '⭐ VIP Ver (+50 Kredi/10dk)'}
+            </button>
+          </div>
         </div>
 
         {/* Section 1: Relocate User */}
@@ -91,7 +124,7 @@ export function AdminControlsModal({
         </div>
 
         {/* Section 2: Grant Credits */}
-        <div style={{ background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+        <div style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.25)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <Coins size={16} /> Kullanıcıya Kredi Ver
           </div>
