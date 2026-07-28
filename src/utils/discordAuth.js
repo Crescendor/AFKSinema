@@ -14,8 +14,16 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  // Dedicated OAuth callback URI: https://afksinema.pages.dev/callback
-  const redirectUri = window.location.origin + '/callback';
+  // Exact current window path (e.g. https://afksinema.pages.dev/)
+  let redirectUri = window.location.origin + window.location.pathname;
+  
+  // Guarantee exact match with Discord Portal Redirects entry
+  if (!redirectUri.endsWith('/')) {
+    redirectUri += '/';
+  }
+
+  console.log('[AFKSinema] Discord OAuth Redirect URI:', redirectUri);
+
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify`;
 };
 
