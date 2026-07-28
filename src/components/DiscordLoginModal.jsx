@@ -57,7 +57,7 @@ export function DiscordLoginModal({ isOpen, onClose, onLogin, tempDiscordUser })
           borderRadius: '24px',
           width: '100%',
           maxWidth: '420px',
-          padding: '36px 28px',
+          padding: '36px 28px 24px 28px',
           textAlign: 'center',
           boxShadow: '0 25px 60px rgba(0,0,0,0.95), 0 0 45px var(--cinema-red-glow)'
         }}
@@ -104,7 +104,8 @@ export function DiscordLoginModal({ isOpen, onClose, onLogin, tempDiscordUser })
                 justifyContent: 'center',
                 gap: '10px',
                 boxShadow: '0 8px 24px var(--cinema-red-glow)',
-                transition: 'transform 0.15s ease'
+                transition: 'transform 0.15s ease',
+                marginBottom: '28px'
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
@@ -145,7 +146,7 @@ export function DiscordLoginModal({ isOpen, onClose, onLogin, tempDiscordUser })
               Salonda ve koltukta görünecek adınızı onaylayın:
             </p>
 
-            <div style={{ marginBottom: '24px', textAlign: 'left' }}>
+            <div style={{ marginBottom: '20px', textAlign: 'left' }}>
               <input
                 type="text"
                 placeholder={tempDiscordUser?.username || 'Discord Kullanıcı Adınız'}
@@ -183,13 +184,24 @@ export function DiscordLoginModal({ isOpen, onClose, onLogin, tempDiscordUser })
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '8px',
-                boxShadow: '0 6px 20px var(--cinema-red-glow)'
+                boxShadow: '0 6px 20px var(--cinema-red-glow)',
+                marginBottom: '24px'
               }}
             >
               <Check size={20} /> Sinemaya Katıl 🍿
             </button>
           </form>
         )}
+
+        {/* Footer Text inside Login Modal */}
+        <div style={{
+          fontSize: '0.78rem',
+          color: 'var(--text-dim)',
+          borderTop: '1px solid rgba(255,255,255,0.08)',
+          paddingTop: '16px'
+        }}>
+          Dox tarafından AFK için Sevgiyle üretildi - 2026
+        </div>
       </div>
     </div>
   );
