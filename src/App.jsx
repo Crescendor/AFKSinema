@@ -30,7 +30,7 @@ const INITIAL_BUFFET_ITEMS = [
 const SNACK_EXPIRY_MS = 20 * 60 * 1000; // 20 Minutes
 
 export default function App() {
-  // localStorage Persistence for User Session
+  // 1. Persistent Current User Session
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_current_user');
@@ -40,19 +40,37 @@ export default function App() {
     }
   });
 
+  // 2. Persistent Seated Users Map
+  const [seatedUsers, setSeatedUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_seated_users');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      return {};
+    }
+  });
+
+  // 3. Persistent Login Modal Open State (Only open if no logged-in user)
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('afk_current_user');
+      return !savedUser;
+    } catch (e) {
+      return true;
+    }
+  });
+
   const [tempDiscordUser, setTempDiscordUser] = useState(null);
-  const [seatedUsers, setSeatedUsers] = useState({});
   const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
   const [isMolaModalOpen, setIsMolaModalOpen] = useState(false);
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
-  // Active Mola Intermission State: { title: string, startTime: number }
+  // Active Mola Intermission State
   const [activeMola, setActiveMola] = useState(null);
 
   // Admin Control Modal State
@@ -85,7 +103,7 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // Persist Current User to localStorage on update
+  // Sync Current User & Seated Users to localStorage
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
@@ -95,6 +113,10 @@ export default function App() {
   }, [currentUser]);
 
   useEffect(() => {
+    localStorage.setItem('afk_seated_users', JSON.stringify(seatedUsers));
+  }, [seatedUsers]);
+
+  useEffect(() => {
     localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
   }, [userCredits]);
 
@@ -102,12 +124,15 @@ export default function App() {
     localStorage.setItem('afk_vip_users', JSON.stringify(vipUsers));
   }, [vipUsers]);
 
-  // If user is already logged in on refresh, assign to default seat
+  // Ensure current user is assigned to a seat on load if missing from seatedUsers
   useEffect(() => {
-    if (currentUser && Object.keys(seatedUsers).length === 0) {
-      setSeatedUsers({ A1: currentUser });
+    if (currentUser) {
+      const isAlreadySeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
+      if (!isAlreadySeated) {
+        setSeatedUsers(prev => ({ ...prev, A1: currentUser }));
+      }
     }
-  }, []);
+  }, [currentUser]);
 
   // 10-Minute Loyalty Credit Interval (+20 for Standard, +50 for VIP)
   useEffect(() => {
@@ -278,7 +303,6 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Automatic Snack Purchase Handler (Left first, then Right)
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -332,7 +356,6 @@ export default function App() {
     });
   };
 
-  // Admin Mola / Intermission Handlers
   const handleStartMola = (molaTitle) => {
     const newMola = { title: molaTitle, startTime: Date.now() };
     setActiveMola(newMola);
@@ -408,6 +431,7 @@ export default function App() {
 
     if (currentUser && currentUser.id === userId) {
       setCurrentUser(null);
+      localStorage.removeItem('afk_current_user');
       setIsLoginModalOpen(true);
     }
 
