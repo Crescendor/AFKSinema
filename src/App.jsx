@@ -6,8 +6,10 @@ import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { AdminControlsModal } from './components/AdminControlsModal';
 import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { MolaModal } from './components/MolaModal';
+import { UserProfileModal } from './components/UserProfileModal';
+import { MovieBillboardLeft } from './components/MovieBillboardLeft';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, ShoppingBag, Coins, Star, Heart } from 'lucide-react';
+import { LogIn, Coins } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -27,10 +29,24 @@ const INITIAL_BUFFET_ITEMS = [
   { id: 'b6', name: 'VIP Altın Mısır', price: 100, icon: '👑' }
 ];
 
-const SNACK_EXPIRY_MS = 20 * 60 * 1000; // 20 Minutes
+const INITIAL_MOVIE_POSTERS = [
+  {
+    id: 'poster1',
+    title: 'Dune: Part Two',
+    imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
+    status: 'Oynatılıyor'
+  },
+  {
+    id: 'poster2',
+    title: 'Cyberpunk Cinema 2077',
+    imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
+    status: 'Yakında'
+  }
+];
+
+const SNACK_EXPIRY_MS = 20 * 60 * 1000;
 
 export default function App() {
-  // 1. Persistent Current User Session
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_current_user');
@@ -40,7 +56,6 @@ export default function App() {
     }
   });
 
-  // 2. Persistent Seated Users Map
   const [seatedUsers, setSeatedUsers] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_seated_users');
@@ -50,7 +65,6 @@ export default function App() {
     }
   });
 
-  // 3. Persistent Login Modal Open State (Only open if no logged-in user)
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => {
     try {
       const savedUser = localStorage.getItem('afk_current_user');
@@ -67,6 +81,8 @@ export default function App() {
 
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
   const [isMolaModalOpen, setIsMolaModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
@@ -77,6 +93,14 @@ export default function App() {
   const [adminModalUser, setAdminModalUser] = useState(null);
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Movie Posters List (with localStorage persistence)
+  const [moviePosters, setMoviePosters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_movie_posters');
+      return saved ? JSON.parse(saved) : INITIAL_MOVIE_POSTERS;
+    } catch (e) { return INITIAL_MOVIE_POSTERS; }
+  });
 
   // Economy, VIP & Snacks State (with localStorage persistence)
   const [userCredits, setUserCredits] = useState(() => {
@@ -103,7 +127,6 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // Sync Current User & Seated Users to localStorage
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
@@ -124,7 +147,10 @@ export default function App() {
     localStorage.setItem('afk_vip_users', JSON.stringify(vipUsers));
   }, [vipUsers]);
 
-  // Ensure current user is assigned to a seat on load if missing from seatedUsers
+  useEffect(() => {
+    localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters));
+  }, [moviePosters]);
+
   useEffect(() => {
     if (currentUser) {
       const isAlreadySeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
@@ -303,6 +329,51 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
+  // Nickname Update Handler
+  const handleUpdateNickname = (newNickname) => {
+    if (!currentUser) return;
+    const updatedUser = { ...currentUser, username: newNickname };
+    setCurrentUser(updatedUser);
+
+    // Update username in seatedUsers
+    setSeatedUsers(prev => {
+      const updated = { ...prev };
+      Object.entries(updated).forEach(([code, u]) => {
+        if (u.id === currentUser.id) {
+          updated[code] = updatedUser;
+        }
+      });
+      return updated;
+    });
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `✏️ ${currentUser.username} ismini "${newNickname}" olarak değiştirdi.`
+    }]);
+  };
+
+  // Logout Handler
+  const handleLogout = () => {
+    if (currentUser) {
+      const userId = currentUser.id;
+      // Remove from seat
+      setSeatedUsers(prev => {
+        const updated = { ...prev };
+        Object.entries(updated).forEach(([code, u]) => {
+          if (u.id === userId) delete updated[code];
+        });
+        return updated;
+      });
+    }
+
+    setCurrentUser(null);
+    localStorage.removeItem('afk_current_user');
+    setIsProfileModalOpen(false);
+    setIsLoginModalOpen(true);
+  };
+
+  // Automatic Snack Purchase Handler (Left first, then Right)
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -354,6 +425,15 @@ export default function App() {
         [userId]: { left: newLeft, right: newRight }
       };
     });
+  };
+
+  // Movie Poster Management Handlers
+  const handleAddMoviePoster = (newPoster) => {
+    setMoviePosters(prev => [newPoster, ...prev]);
+  };
+
+  const handleDeleteMoviePoster = (posterId) => {
+    setMoviePosters(prev => prev.filter(p => p.id !== posterId));
   };
 
   const handleStartMola = (molaTitle) => {
@@ -539,7 +619,7 @@ export default function App() {
 
           {currentUser ? (
             <div 
-              onClick={() => setIsLoginModalOpen(true)}
+              onClick={() => setIsProfileModalOpen(true)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -550,6 +630,7 @@ export default function App() {
                 borderRadius: '30px',
                 cursor: 'pointer'
               }}
+              title="Profil Ayarları & Çıkış"
             >
               <img src={currentUser.avatar} alt={currentUser.username} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{currentUser.username}</span>
@@ -569,6 +650,14 @@ export default function App() {
 
       {/* Main Body */}
       <div className="cinema-app-body">
+        {/* Left Side: Cinema Movie Posters Billboard Panel */}
+        <MovieBillboardLeft
+          moviePosters={moviePosters}
+          onAddMoviePoster={handleAddMoviePoster}
+          onDeleteMoviePoster={handleDeleteMoviePoster}
+          isAdmin={isAdmin}
+        />
+
         {/* Workspace: Screen + Auditorium */}
         <main className="cinema-hall-workspace" style={{ flex: 1 }}>
           <CinemaScreen
@@ -641,6 +730,15 @@ export default function App() {
         onLogin={handleLogin}
         tempDiscordUser={tempDiscordUser}
         currentUser={currentUser}
+      />
+
+      <UserProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        currentUser={currentUser}
+        onUpdateNickname={handleUpdateNickname}
+        onLogout={handleLogout}
+        isAdmin={isAdmin}
       />
 
       <CinemaBuffetModal
