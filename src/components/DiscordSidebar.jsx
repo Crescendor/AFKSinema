@@ -1,18 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, Search, X, Link as LinkIcon, Trash2, Shield, Settings } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, X, Link as LinkIcon, Trash2, Settings } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
-
-const INITIAL_GIFS = [
-  { id: 'gif1', title: 'Popcorn Eat', url: 'https://media.giphy.com/media/hD9hL1xKvfB84/giphy.gif' },
-  { id: 'gif2', title: 'Cinema Hype', url: 'https://media.giphy.com/media/t3qzK0rU7RjJS/giphy.gif' },
-  { id: 'gif3', title: 'Mind Blown', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif' },
-  { id: 'gif4', title: 'Cheering Crowd', url: 'https://media.giphy.com/media/l0AMJzvh559fIn98A/giphy.gif' },
-  { id: 'gif5', title: 'Cat Popcorn', url: 'https://media.giphy.com/media/13CoXDiaCcCoyk/giphy.gif' },
-  { id: 'gif6', title: 'Laughing Hysterical', url: 'https://media.giphy.com/media/wW95fQuLluBqw/giphy.gif' },
-  { id: 'gif7', title: 'Gaming Win', url: 'https://media.giphy.com/media/d9N8B1f67fPFe/giphy.gif' },
-  { id: 'gif8', title: 'Cyberpunk Vibe', url: 'https://media.giphy.com/media/fVzdQ7uYhTXajvTF7U/giphy.gif' }
-];
 
 const EMOJI_CATEGORIES = [
   { name: 'Sinema & Eğlence', emojis: ['🍿', '🎬', '📽️', '🎭', '🎧', '🎮', '👑', '🎟️'] },
@@ -33,51 +22,14 @@ export function DiscordSidebar({
   const [text, setText] = useState('');
   
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showGifPicker, setShowGifPicker] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [gifSearchQuery, setGifSearchQuery] = useState('');
-  const [gifResults, setGifResults] = useState(INITIAL_GIFS);
-  const [isSearchingGifs, setIsSearchingGifs] = useState(false);
-
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  useEffect(() => {
-    if (!gifSearchQuery.trim()) {
-      setGifResults(INITIAL_GIFS);
-      return;
-    }
-
-    const timer = setTimeout(async () => {
-      setIsSearchingGifs(true);
-      try {
-        const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=pL0W9BUtB7bM6ngRWBCLKRkUhFjvuaAr&limit=10&q=${encodeURIComponent(gifSearchQuery.trim())}`);
-        const data = await res.json();
-
-        if (data.data && data.data.length > 0) {
-          const fetchedGifs = data.data.map(item => ({
-            id: item.id,
-            title: item.title,
-            url: item.images.fixed_height.url
-          }));
-          setGifResults(fetchedGifs);
-        } else {
-          setGifResults(INITIAL_GIFS.filter(g => g.title.toLowerCase().includes(gifSearchQuery.toLowerCase())));
-        }
-      } catch (err) {
-        setGifResults(INITIAL_GIFS.filter(g => g.title.toLowerCase().includes(gifSearchQuery.toLowerCase())));
-      } finally {
-        setIsSearchingGifs(false);
-      }
-    }, 350);
-
-    return () => clearTimeout(timer);
-  }, [gifSearchQuery]);
 
   const handleSendText = (e) => {
     e.preventDefault();
@@ -85,12 +37,6 @@ export function DiscordSidebar({
     onSendMessage({ text: text.trim(), type: 'text' });
     setText('');
     setShowEmojiPicker(false);
-  };
-
-  const handleSendGif = (gifUrl) => {
-    sounds.playEmojiPop();
-    onSendMessage({ type: 'gif', gifUrl });
-    setShowGifPicker(false);
   };
 
   const handleSendImage = (e) => {
@@ -119,14 +65,6 @@ export function DiscordSidebar({
   };
 
   const renderMessageContent = (msg) => {
-    if (msg.type === 'gif') {
-      return (
-        <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', maxWidth: '240px' }}>
-          <img src={msg.gifUrl} alt="GIF" style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
-        </div>
-      );
-    }
-
     if (msg.type === 'image') {
       return (
         <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', maxWidth: '240px', border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -148,7 +86,7 @@ export function DiscordSidebar({
                 href={part}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: 'var(--discord-blurple)', textDecoration: 'underline', fontWeight: 600, wordBreak: 'break-all' }}
+                style={{ color: 'var(--cinema-red)', textDecoration: 'underline', fontWeight: 600, wordBreak: 'break-all' }}
               >
                 {part} <LinkIcon size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
               </a>
@@ -172,7 +110,7 @@ export function DiscordSidebar({
       {/* Header */}
       <div className="sidebar-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--discord-green)' }} />
+          <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--cinema-red)' }} />
           <span style={{ fontWeight: 800, fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>
             AFK Sinema Sohbeti
           </span>
@@ -246,56 +184,10 @@ export function DiscordSidebar({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Giphy GIF Drawer */}
-          {showGifPicker && (
-            <div style={{
-              background: '#161b2e',
-              borderTop: '1px solid var(--bg-card-border)',
-              padding: '12px',
-              maxHeight: '260px',
-              overflowY: 'auto'
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--discord-blurple)' }}>GIPHY GIF Arama</span>
-                <button onClick={() => setShowGifPicker(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
-              </div>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <Search size={14} color="var(--text-muted)" />
-                <input
-                  type="text"
-                  placeholder="GIF Ara..."
-                  value={gifSearchQuery}
-                  onChange={(e) => setGifSearchQuery(e.target.value)}
-                  style={{ flex: 1, background: 'none', border: 'none', color: 'white', fontSize: '0.75rem', outline: 'none' }}
-                />
-                {gifSearchQuery && (
-                  <button onClick={() => setGifSearchQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={12} /></button>
-                )}
-              </div>
-
-              {isSearchingGifs ? (
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>GIPHY'de aranıyor...</div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                  {gifResults.map((gif) => (
-                    <img
-                      key={gif.id}
-                      src={gif.url}
-                      alt={gif.title}
-                      onClick={() => handleSendGif(gif.url)}
-                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Emoji Picker Popover */}
           {showEmojiPicker && (
             <div style={{
-              background: '#161b2e',
+              background: '#190a0f',
               borderTop: '1px solid var(--bg-card-border)',
               padding: '12px',
               maxHeight: '200px',
@@ -326,7 +218,7 @@ export function DiscordSidebar({
 
           {/* Image Upload Modal */}
           {showImageModal && (
-            <div style={{ background: '#161b2e', borderTop: '1px solid var(--bg-card-border)', padding: '12px' }}>
+            <div style={{ background: '#190a0f', borderTop: '1px solid var(--bg-card-border)', padding: '12px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                 <span style={{ fontSize: '0.78rem', fontWeight: 800 }}>Resim Gönder</span>
                 <button onClick={() => setShowImageModal(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
@@ -351,16 +243,9 @@ export function DiscordSidebar({
           )}
 
           {/* Chat Toolbar & Input */}
-          <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '1px solid var(--bg-card-border)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div style={{ background: 'rgba(0,0,0,0.4)', borderTop: '1px solid var(--bg-card-border)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '10px' }}>
             <button
-              onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); setShowImageModal(false); }}
-              style={{ background: 'rgba(88, 101, 242, 0.2)', border: '1px solid var(--discord-blurple)', color: 'white', padding: '4px 8px', borderRadius: '6px', fontSize: '0.7rem', fontWeight: 800, cursor: 'pointer' }}
-            >
-              GIF
-            </button>
-
-            <button
-              onClick={() => { setShowImageModal(!showImageModal); setShowEmojiPicker(false); setShowGifPicker(false); }}
+              onClick={() => { setShowImageModal(!showImageModal); setShowEmojiPicker(false); }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               title="Resim Ekle"
             >
@@ -368,7 +253,7 @@ export function DiscordSidebar({
             </button>
 
             <button
-              onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowGifPicker(false); setShowImageModal(false); }}
+              onClick={() => { setShowEmojiPicker(!showEmojiPicker); setShowImageModal(false); }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
               title="Emoji Ekle"
             >
@@ -430,7 +315,7 @@ export function DiscordSidebar({
 
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{
-                      background: 'var(--discord-blurple)',
+                      background: 'var(--cinema-red)',
                       color: 'white',
                       padding: '2px 8px',
                       borderRadius: '6px',
@@ -440,12 +325,11 @@ export function DiscordSidebar({
                       {seatCode}
                     </span>
 
-                    {/* Admin Action Button */}
                     {isAdmin && !isMe && (
                       <button
                         onClick={() => onOpenAdminModal(user, seatCode)}
                         style={{
-                          background: 'rgba(255, 183, 3, 0.2)',
+                          background: 'rgba(251, 191, 36, 0.2)',
                           border: '1px solid var(--accent-gold)',
                           color: 'var(--accent-gold)',
                           borderRadius: '6px',
