@@ -49,6 +49,23 @@ const INITIAL_MOVIE_POSTERS = [
 
 const SNACK_EXPIRY_MS = 20 * 60 * 1000;
 
+// Strict Deduplication Helper: Guarantees each user.id only occupies ONE seat maximum
+function sanitizeSeatedUsers(seatedMap) {
+  if (!seatedMap || typeof seatedMap !== 'object') return {};
+  const cleaned = {};
+  const seenUserIds = new Set();
+
+  // Process seats in order, keeping only the first/latest occurrence of each user ID
+  Object.entries(seatedMap).forEach(([seatCode, user]) => {
+    if (user && user.id && !seenUserIds.has(user.id)) {
+      seenUserIds.add(user.id);
+      cleaned[seatCode] = user;
+    }
+  });
+
+  return cleaned;
+}
+
 export default function App() {
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -62,7 +79,7 @@ export default function App() {
   const [seatedUsers, setSeatedUsers] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_seated_users');
-      return saved ? JSON.parse(saved) : {};
+      return saved ? sanitizeSeatedUsers(JSON.parse(saved)) : {};
     } catch (e) {
       return {};
     }
@@ -102,8 +119,16 @@ export default function App() {
   const [moviePosters, setMoviePosters] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_movie_posters');
-      return saved ? JSON.parse(saved) : INITIAL_MOVIE_POSTERS;
+      return saved !== null ? JSON.parse(saved) : INITIAL_MOVIE_POSTERS;
     } catch (e) { return INITIAL_MOVIE_POSTERS; }
+  });
+
+  // Persistent Buffet Items State (saved in localStorage so it NEVER changes on reload/update)
+  const [buffetItems, setBuffetItems] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_buffet_items');
+      return saved !== null ? JSON.parse(saved) : INITIAL_BUFFET_ITEMS;
+    } catch (e) { return INITIAL_BUFFET_ITEMS; }
   });
 
   // Economy, VIP & Snacks State
@@ -122,7 +147,6 @@ export default function App() {
   });
 
   const [userSnacks, setUserSnacks] = useState({});
-  const [buffetItems, setBuffetItems] = useState(INITIAL_BUFFET_ITEMS);
 
   // Seat Change Anti-Spam Tracker & Ban List
   const [seatChangeLimits, setSeatChangeLimits] = useState({});
@@ -139,11 +163,13 @@ export default function App() {
         if (res.ok) {
           const room = await res.json();
 
-          // Sync Seated Users
+          // Sync & Deduplicate Seated Users
           if (room.seatedUsers && typeof room.seatedUsers === 'object') {
+            const sanitized = sanitizeSeatedUsers(room.seatedUsers);
             setSeatedUsers(prev => {
-              const merged = { ...prev, ...room.seatedUsers };
-              return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev;
+              const prevStr = JSON.stringify(prev);
+              const nextStr = JSON.stringify(sanitized);
+              return prevStr !== nextStr ? sanitized : prev;
             });
           }
 
@@ -191,6 +217,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('afk_seated_users', JSON.stringify(seatedUsers));
   }, [seatedUsers]);
+
+  useEffect(() => {
+    localStorage.setItem('afk_buffet_items', JSON.stringify(buffetItems));
+  }, [buffetItems]);
 
   useEffect(() => {
     localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
@@ -328,18 +358,17 @@ export default function App() {
       setSeatChangeLimits({ ...seatChangeLimits });
     }
 
-    let oldSeatCode = null;
+    // Remove user from any existing seat first
+    const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
-      if (u.id === currentUser.id) oldSeatCode = code;
+      if (u.id !== currentUser.id) updated[code] = u;
     });
-
-    const updated = { ...seatedUsers };
-    if (oldSeatCode) delete updated[oldSeatCode];
     updated[seatCode] = currentUser;
 
-    setSeatedUsers(updated);
+    const sanitized = sanitizeSeatedUsers(updated);
+    setSeatedUsers(sanitized);
 
-    // Sync to Cloudflare
+    // Sync to Cloudflare Edge
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -370,15 +399,13 @@ export default function App() {
 
     const seatToOccupy = targetSeatCode || 'A1';
     
-    let oldSeatCode = null;
+    const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
-      if (u.id === finalUser.id) oldSeatCode = code;
+      if (u.id !== finalUser.id) updated[code] = u;
     });
-
-    const updated = { ...seatedUsers };
-    if (oldSeatCode) delete updated[oldSeatCode];
     updated[seatToOccupy] = finalUser;
-    setSeatedUsers(updated);
+    const sanitized = sanitizeSeatedUsers(updated);
+    setSeatedUsers(sanitized);
 
     fetch('/api/room', {
       method: 'POST',
@@ -407,7 +434,7 @@ export default function App() {
           updated[code] = updatedUser;
         }
       });
-      return updated;
+      return sanitizeSeatedUsers(updated);
     });
 
     setMessages(prev => [...prev, {
@@ -425,7 +452,7 @@ export default function App() {
         Object.entries(updated).forEach(([code, u]) => {
           if (u.id === userId) delete updated[code];
         });
-        return updated;
+        return sanitizeSeatedUsers(updated);
       });
     }
 
@@ -573,7 +600,8 @@ export default function App() {
     if (targetUserObj) {
       delete updated[oldSeat];
       updated[newSeat] = targetUserObj;
-      setSeatedUsers(updated);
+      const sanitized = sanitizeSeatedUsers(updated);
+      setSeatedUsers(sanitized);
 
       fetch('/api/room', {
         method: 'POST',
@@ -602,7 +630,7 @@ export default function App() {
     Object.entries(updated).forEach(([code, u]) => {
       if (u.id === userId) delete updated[code];
     });
-    setSeatedUsers(updated);
+    setSeatedUsers(sanitizeSeatedUsers(updated));
 
     if (currentUser && currentUser.id === userId) {
       setCurrentUser(null);
