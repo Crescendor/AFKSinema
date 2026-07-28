@@ -8,18 +8,14 @@ import { InteractionsOverlay } from './components/InteractionsOverlay';
 import { LogIn } from 'lucide-react';
 import { fetchDiscordUserProfile, isAdminUser } from './utils/discordAuth';
 
-const INITIAL_MESSAGES = [
-  { id: 'msg_1', type: 'system', text: 'AFKSinema perdesine hoş geldiniz! Lütfen Discord hesabınızla giriş yapın.' }
-];
-
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null); // No pre-filled prop user!
-  const [seatedUsers, setSeatedUsers] = useState({}); // Empty cinema seats initial state!
-  const [messages, setMessages] = useState(INITIAL_MESSAGES);
+  const [currentUser, setCurrentUser] = useState(null); // Strictly null initial state
+  const [seatedUsers, setSeatedUsers] = useState({}); // Strictly empty initial seats
+  const [messages, setMessages] = useState([]); // Strictly empty chat
   const [broadcasterName, setBroadcasterName] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true); // Mandatory Discord Login screen on start!
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true); // Always open landing modal
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
@@ -35,14 +31,13 @@ export default function App() {
             setCurrentUser(profile);
             setIsLoginModalOpen(false);
             window.history.replaceState(null, '', window.location.pathname);
-            
-            // Auto seat on VIP A1
+
             const seatCode = 'A1';
             setSeatedUsers(prev => ({ ...prev, [seatCode]: profile }));
             setMessages(prev => [...prev, {
               id: 'sys_' + Date.now(),
               type: 'system',
-              text: `${profile.username} (${profile.badge}) salona katıldı ve ${seatCode} koltuğuna oturdu 🍿`
+              text: `${profile.username} salona katıldı!`
             }]);
           }
         });
@@ -80,7 +75,6 @@ export default function App() {
     setCurrentUser(user);
     setIsLoginModalOpen(false);
 
-    // Auto place on selected seat or VIP A1
     const seatToOccupy = targetSeatCode || 'A1';
     handleSelectSeat(seatToOccupy);
     setTargetSeatCode(null);
@@ -224,7 +218,7 @@ export default function App() {
       </div>
 
       <DiscordLoginModal
-        isOpen={isLoginModalOpen}
+        isOpen={!currentUser || isLoginModalOpen}
         onClose={() => {
           if (currentUser) setIsLoginModalOpen(false);
         }}

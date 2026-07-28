@@ -1,30 +1,10 @@
 // Cloudflare Pages Function: /api/room
-// Handles real-time cinema room state & discord seat synchronization on Cloudflare Edge
+// Clean state with 0 dummy users and empty chat
 
-// In-memory global state on Worker instance
 let globalRoomState = {
   broadcaster: null,
-  seatedUsers: {
-    'A4': {
-      id: 'user_1',
-      username: 'Burak',
-      discriminator: '1337',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-      role: 'VIP Cinema Host',
-      badge: '👑 Admin'
-    },
-    'B5': {
-      id: 'user_3',
-      username: 'MovieBuff_Eda',
-      discriminator: '2026',
-      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=150&q=80',
-      role: 'Sinemasever',
-      badge: '🍿 Mısır Canavarı'
-    }
-  },
-  messages: [
-    { id: 'msg_1', type: 'system', text: 'Cloudflare Workers & Pages üzerinde AFKSinema Odası Canlı!' }
-  ]
+  seatedUsers: {},
+  messages: []
 };
 
 export async function onRequestGet(context) {
@@ -44,7 +24,6 @@ export async function onRequestPost(context) {
 
     if (action === 'SEAT_OCCUPY') {
       const { seatCode, user } = data;
-      // remove user from previous seat
       Object.keys(globalRoomState.seatedUsers).forEach(code => {
         if (globalRoomState.seatedUsers[code].id === user.id) {
           delete globalRoomState.seatedUsers[code];
