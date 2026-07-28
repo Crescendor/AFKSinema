@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Film, Plus, Trash2, X, Sparkles, Eye } from 'lucide-react';
+import { Film, Plus, Trash2, Calendar } from 'lucide-react';
 
 export function MovieBillboardLeft({
   moviePosters,
@@ -10,7 +10,8 @@ export function MovieBillboardLeft({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [imageUrl, setImageUrl] = useState('');
-  const [status, setStatus] = useState('Oynatılıyor'); // 'Oynatılıyor' or 'Yakında'
+  const [releaseDate, setReleaseDate] = useState('29 Temmuz 2026');
+  const [status, setStatus] = useState('Oynatılıyor');
 
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
@@ -31,6 +32,7 @@ export function MovieBillboardLeft({
       id: 'poster_' + Date.now(),
       title: title.trim(),
       imageUrl: imageUrl.trim(),
+      releaseDate: releaseDate.trim() || 'Çok Yakında',
       status
     };
 
@@ -93,6 +95,14 @@ export function MovieBillboardLeft({
             placeholder="Film Adı"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.75rem', marginBottom: '6px' }}
+          />
+
+          <input
+            type="text"
+            placeholder="Gösterim Tarihi (Örn: 29 Temmuz 2026)"
+            value={releaseDate}
+            onChange={(e) => setReleaseDate(e.target.value)}
             style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.75rem', marginBottom: '6px' }}
           />
 
@@ -179,10 +189,9 @@ export function MovieBillboardLeft({
               fontWeight: 800,
               zIndex: 5
             }}>
-              {poster.status === 'Oynatılıyor' ? '🎥 ŞİMDİ OYNATILIYOR' : '🍿 YAKINDA'}
+              {poster.status === 'Oynatılıyor' ? '🎥 OYNATILIYOR' : '🍿 YAKINDA'}
             </div>
 
-            {/* Delete button for Admin */}
             {isAdmin && (
               <button
                 onClick={() => onDeleteMoviePoster(poster.id)}
@@ -215,20 +224,22 @@ export function MovieBillboardLeft({
               style={{ width: '100%', height: '320px', objectFit: 'cover', display: 'block' }}
             />
 
-            {/* Title Bar */}
+            {/* Title & Release Date Overlay */}
             <div style={{
               position: 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
-              padding: '10px',
-              background: 'linear-gradient(to top, rgba(9,4,6,0.95), transparent)',
-              fontWeight: 800,
-              fontSize: '0.85rem',
-              color: 'white',
+              padding: '12px 10px',
+              background: 'linear-gradient(to top, rgba(9,4,6,0.98) 20%, transparent)',
               textShadow: '0 2px 4px rgba(0,0,0,0.8)'
             }}>
-              {poster.title}
+              <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'white', marginBottom: '2px' }}>
+                {poster.title}
+              </div>
+              <div style={{ fontSize: '0.7rem', color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                <Calendar size={12} /> {poster.releaseDate || 'Çok Yakında'}
+              </div>
             </div>
           </div>
         ))}

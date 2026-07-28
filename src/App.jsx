@@ -35,12 +35,14 @@ const INITIAL_MOVIE_POSTERS = [
     id: 'poster1',
     title: 'Dune: Part Two',
     imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
+    releaseDate: '29 Temmuz 2026',
     status: 'Oynatılıyor'
   },
   {
     id: 'poster2',
     title: 'Cyberpunk Cinema 2077',
     imageUrl: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?auto=format&fit=crop&w=600&q=80',
+    releaseDate: '15 Ağustos 2026',
     status: 'Yakında'
   }
 ];
@@ -595,7 +597,7 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Admin Master Panel Button */}
+          {/* Top-Right Master Admin Panel Button */}
           {isAdmin && (
             <button
               className="btn-cinema"
@@ -779,7 +781,7 @@ export default function App() {
         isTargetVip={adminModalUser && (vipUsers[adminModalUser.id] || isAdminUser(adminModalUser))}
       />
 
-      {/* Unified Master Admin Panel Modal */}
+      {/* Master Top-Right Admin Panel Modal */}
       <AdminMasterPanelModal
         isOpen={isAdminMasterOpen}
         onClose={() => setIsAdminMasterOpen(false)}
@@ -799,6 +801,12 @@ export default function App() {
         buffetItems={buffetItems}
         onAddBuffetItem={handleAddBuffetItem}
         onDeleteBuffetItem={handleDeleteBuffetItem}
+        isBroadcasting={!!broadcasterName}
+        broadcasterName={broadcasterName}
+        onStartBroadcast={() => {}}
+        onStopBroadcast={() => setBroadcasterName('')}
+        lightsDimmed={lightsDimmed}
+        onToggleLights={() => setLightsDimmed(!lightsDimmed)}
       />
     </div>
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Film, Coffee, Users, ShoppingBag, Plus, Trash2, ArrowRightLeft, Coins, Star, Ban, X, Play, Square } from 'lucide-react';
+import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Plus, Trash2, ArrowRightLeft, Coins, Star, Ban, X, Play, Square, Calendar, Lightbulb } from 'lucide-react';
 
 export function AdminMasterPanelModal({
   isOpen,
@@ -19,13 +19,20 @@ export function AdminMasterPanelModal({
   onToggleVip,
   buffetItems,
   onAddBuffetItem,
-  onDeleteBuffetItem
+  onDeleteBuffetItem,
+  isBroadcasting,
+  broadcasterName,
+  onStartBroadcast,
+  onStopBroadcast,
+  lightsDimmed,
+  onToggleLights
 }) {
-  const [activeTab, setActiveTab] = useState('movies');
+  const [activeTab, setActiveTab] = useState('screen');
 
   // Movie Poster State
   const [movieTitle, setMovieTitle] = useState('');
   const [movieImageUrl, setMovieImageUrl] = useState('');
+  const [movieReleaseDate, setMovieReleaseDate] = useState('29 Temmuz 2026');
   const [movieStatus, setMovieStatus] = useState('Oynatılıyor');
 
   // Mola State
@@ -64,6 +71,7 @@ export function AdminMasterPanelModal({
       id: 'poster_' + Date.now(),
       title: movieTitle.trim(),
       imageUrl: movieImageUrl.trim(),
+      releaseDate: movieReleaseDate.trim() || 'Çok Yakında',
       status: movieStatus
     });
 
@@ -123,11 +131,11 @@ export function AdminMasterPanelModal({
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '640px', padding: '28px' }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '660px', padding: '28px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: 'var(--accent-gold)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 20px rgba(251, 191, 36, 0.4)' }}>
               <Shield size={24} color="black" />
             </div>
             <div>
@@ -135,19 +143,20 @@ export function AdminMasterPanelModal({
                 👑 VIP Admin Ana Kontrol Paneli
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Film afişleri, mola duyuruları, kullanıcı koltuk/VIP yönetimi ve büfe kontrolü
+                Yayın, film afişleri, mola, kullanıcılar ve büfe yönetimi tek ekranda
               </p>
             </div>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={20} /></button>
         </div>
 
-        {/* Tab Buttons */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px', marginBottom: '20px', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '12px' }}>
+        {/* Tab Navigation */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 1fr', gap: '4px', marginBottom: '20px', background: 'rgba(0,0,0,0.4)', padding: '4px', borderRadius: '12px' }}>
           {[
-            { id: 'movies', label: '🎬 Filmler', icon: Film },
+            { id: 'screen', label: '📺 Yayın', icon: Monitor },
+            { id: 'movies', label: '🎬 Afişler', icon: Film },
             { id: 'mola', label: '☕ Mola', icon: Coffee },
-            { id: 'users', label: '👥 Kullanıcılar', icon: Users },
+            { id: 'users', label: '👥 Üyeler', icon: Users },
             { id: 'buffet', label: '🍿 Büfe', icon: ShoppingBag }
           ].map(tab => {
             const IconComp = tab.icon;
@@ -160,30 +169,70 @@ export function AdminMasterPanelModal({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '6px',
-                  padding: '8px',
+                  gap: '4px',
+                  padding: '8px 4px',
                   borderRadius: '8px',
                   border: 'none',
                   background: isActive ? 'var(--cinema-red)' : 'transparent',
                   color: isActive ? 'white' : 'var(--text-muted)',
-                  fontSize: '0.8rem',
+                  fontSize: '0.78rem',
                   fontWeight: 700,
                   cursor: 'pointer',
                   transition: 'all 0.2s ease'
                 }}
               >
-                <IconComp size={14} /> {tab.label}
+                <IconComp size={13} /> {tab.label}
               </button>
             );
           })}
         </div>
 
-        {/* TAB 1: MOVIE POSTERS */}
+        {/* TAB 0: SCREEN & BROADCAST CONTROL */}
+        {activeTab === 'screen' && (
+          <div>
+            <div style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '14px', border: '1px solid var(--bg-card-border)', marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Monitor size={18} /> Discord Yayın Ekranı Paylaşımı
+              </div>
+
+              {isBroadcasting ? (
+                <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', padding: '14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <div style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: 700 }}>
+                    🎥 Yayın Canlı! Yayıncı: {broadcasterName}
+                  </div>
+                  <button onClick={onStopBroadcast} className="btn-cinema" style={{ background: '#ef4444', color: 'white', borderColor: '#ef4444', padding: '6px 12px', fontSize: '0.78rem' }}>
+                    Yayını Durdur
+                  </button>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                    Discord pencerenizi veya ekranınızı dev sinema perdesine yansıtın.
+                  </span>
+                  <button onClick={() => { onStartBroadcast(); onClose(); }} className="btn-cinema primary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
+                    <Play size={16} /> Paylaşımı Başlat
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 700 }}>
+                <Lightbulb size={16} color="var(--accent-gold)" /> Sinema Işıkları
+              </div>
+              <button onClick={onToggleLights} className="btn-cinema" style={{ padding: '6px 14px', fontSize: '0.8rem' }}>
+                {lightsDimmed ? '💡 Işıkları Aç' : '🌙 Işıkları Kapat'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 1: MOVIE POSTERS & RELEASE DATES */}
         {activeTab === 'movies' && (
           <div>
             <form onSubmit={handleAddPosterSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--bg-card-border)' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '10px' }}>
-                + Yeni Film Afişi Ekle
+                + Yeni Film Afişi & Gösterim Tarihi Ekle
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -195,19 +244,29 @@ export function AdminMasterPanelModal({
                   style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
                 />
 
+                <input
+                  type="text"
+                  placeholder="Tarih (Örn: 29 Temmuz 2026)"
+                  value={movieReleaseDate}
+                  onChange={(e) => setMovieReleaseDate(e.target.value)}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px', marginBottom: '10px' }}>
+                <input
+                  type="url"
+                  placeholder="Afiş Görsel URL Yapıştır"
+                  value={movieImageUrl}
+                  onChange={(e) => setMovieImageUrl(e.target.value)}
+                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
+                />
+
                 <label className="btn-cinema" style={{ display: 'flex', justifyContent: 'center', padding: '6px', fontSize: '0.75rem', cursor: 'pointer' }}>
                   📷 Görsel Yükle
                   <input type="file" accept="image/*" onChange={handleMovieFileUpload} style={{ display: 'none' }} />
                 </label>
               </div>
-
-              <input
-                type="url"
-                placeholder="Veya Afiş Görsel URL Yapıştır"
-                value={movieImageUrl}
-                onChange={(e) => setMovieImageUrl(e.target.value)}
-                style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem', marginBottom: '10px' }}
-              />
 
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', gap: '6px' }}>
@@ -240,7 +299,9 @@ export function AdminMasterPanelModal({
                     <img src={p.imageUrl} alt={p.title} style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px' }} />
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
-                      <div style={{ fontSize: '0.7rem', color: p.status === 'Oynatılıyor' ? 'var(--cinema-red)' : 'var(--accent-gold)' }}>{p.status}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status}
+                      </div>
                     </div>
                   </div>
                   <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
