@@ -13,15 +13,15 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  // Clean origin URL without trailing slash: https://afksinema.pages.dev
-  const redirectUri = window.location.origin;
+  // Explicit /callback path for OAuth redirect
+  const redirectUri = window.location.origin + '/callback';
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
 };
 
 // Exchange OAuth Code for Token via Cloudflare Edge API (/api/discord-token)
 export const exchangeCodeForUser = async (code) => {
   try {
-    const redirectUri = window.location.origin;
+    const redirectUri = window.location.origin + '/callback';
 
     const tokenRes = await fetch('/api/discord-token', {
       method: 'POST',
