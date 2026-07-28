@@ -13,15 +13,15 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  // Explicit /callback path for OAuth redirect
-  const redirectUri = window.location.origin + '/callback';
+  // Direct root path for OAuth redirect
+  const redirectUri = window.location.origin + '/';
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
 };
 
 // Exchange OAuth Code for Token via Cloudflare Edge API (/api/discord-token)
-export const exchangeCodeForUser = async (code) => {
+export const exchangeCodeForUser = async (code, customRedirectUri) => {
   try {
-    const redirectUri = window.location.origin + '/callback';
+    const redirectUri = customRedirectUri || (window.location.origin + '/');
 
     const tokenRes = await fetch('/api/discord-token', {
       method: 'POST',
@@ -29,7 +29,18 @@ export const exchangeCodeForUser = async (code) => {
       body: JSON.stringify({ code, redirectUri })
     });
 
-    if (!tokenRes.ok) throw new Error('Token değişimi başarısız');
+    if (!tokenRes.ok) {
+      // Fallback try with /callback redirect uri if registered in Discord Portal
+      const fallbackUri = window.location.origin + '/callback';
+      const fallbackRes = await fetch('/api/discord-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, redirectUri: fallbackUri })
+      });
+      if (!fallbackRes.ok) throw new Error('Token değişimi başarısız');
+      const fallbackData = await fallbackRes.json();
+      return await fetchDiscordUserProfile(fallbackData.access_token);
+    }
 
     const tokenData = await tokenRes.json();
     if (!tokenData.access_token) throw new Error('Access token alınamadı');

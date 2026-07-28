@@ -49,13 +49,11 @@ const INITIAL_MOVIE_POSTERS = [
 
 const SNACK_EXPIRY_MS = 20 * 60 * 1000;
 
-// Strict Deduplication Helper: Guarantees each user.id only occupies ONE seat maximum
 function sanitizeSeatedUsers(seatedMap) {
   if (!seatedMap || typeof seatedMap !== 'object') return {};
   const cleaned = {};
   const seenUserIds = new Set();
 
-  // Process seats in order, keeping only the first/latest occurrence of each user ID
   Object.entries(seatedMap).forEach(([seatCode, user]) => {
     if (user && user.id && !seenUserIds.has(user.id)) {
       seenUserIds.add(user.id);
@@ -115,7 +113,7 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Movie Posters List (with localStorage persistence)
+  // Movie Posters List
   const [moviePosters, setMoviePosters] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_movie_posters');
@@ -123,7 +121,7 @@ export default function App() {
     } catch (e) { return INITIAL_MOVIE_POSTERS; }
   });
 
-  // Persistent Buffet Items State (saved in localStorage so it NEVER changes on reload/update)
+  // Persistent Buffet Items State
   const [buffetItems, setBuffetItems] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_buffet_items');
@@ -309,8 +307,8 @@ export default function App() {
         if (profile) {
           setTempDiscordUser(profile);
           setIsLoginModalOpen(true);
-          window.history.replaceState(null, '', window.location.pathname);
         }
+        window.history.replaceState(null, '', window.location.pathname.replace(/\/callback\/?$/, '/'));
       });
     } else if (hash && hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1));
@@ -320,8 +318,8 @@ export default function App() {
           if (profile) {
             setTempDiscordUser(profile);
             setIsLoginModalOpen(true);
-            window.history.replaceState(null, '', window.location.pathname);
           }
+          window.history.replaceState(null, '', window.location.pathname.replace(/\/callback\/?$/, '/'));
         });
       }
     }
@@ -358,7 +356,6 @@ export default function App() {
       setSeatChangeLimits({ ...seatChangeLimits });
     }
 
-    // Remove user from any existing seat first
     const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
       if (u.id !== currentUser.id) updated[code] = u;
@@ -368,7 +365,6 @@ export default function App() {
     const sanitized = sanitizeSeatedUsers(updated);
     setSeatedUsers(sanitized);
 
-    // Sync to Cloudflare Edge
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -515,7 +511,6 @@ export default function App() {
     });
   };
 
-  // Synchronized Movie Poster Handlers
   const handleAddMoviePoster = (newPoster) => {
     setMoviePosters(prev => {
       const updated = [newPoster, ...prev];
