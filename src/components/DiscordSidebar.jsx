@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, Search, X, Link as LinkIcon, Sparkles } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, Search, X, Link as LinkIcon, Trash2, Sparkles } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
+import { isAdminUser } from '../utils/discordAuth';
 
-// Curated Giphy GIF Search & Trending list for quick instant selection
-const QUICK_GIFS = [
+// Curated Fallback Giphy GIF List
+const INITIAL_GIFS = [
   { id: 'gif1', title: 'Popcorn Eat', url: 'https://media.giphy.com/media/hD9hL1xKvfB84/giphy.gif' },
   { id: 'gif2', title: 'Cinema Hype', url: 'https://media.giphy.com/media/t3qzK0rU7RjJS/giphy.gif' },
   { id: 'gif3', title: 'Mind Blown', url: 'https://media.giphy.com/media/26ufdipQqU2lhNA4g/giphy.gif' },
@@ -11,7 +12,9 @@ const QUICK_GIFS = [
   { id: 'gif5', title: 'Cat Popcorn', url: 'https://media.giphy.com/media/13CoXDiaCcCoyk/giphy.gif' },
   { id: 'gif6', title: 'Laughing Hysterical', url: 'https://media.giphy.com/media/wW95fQuLluBqw/giphy.gif' },
   { id: 'gif7', title: 'Gaming Win', url: 'https://media.giphy.com/media/d9N8B1f67fPFe/giphy.gif' },
-  { id: 'gif8', title: 'Cyberpunk Vibe', url: 'https://media.giphy.com/media/fVzdQ7uYhTXajvTF7U/giphy.gif' }
+  { id: 'gif8', title: 'Cyberpunk Vibe', url: 'https://media.giphy.com/media/fVzdQ7uYhTXajvTF7U/giphy.gif' },
+  { id: 'gif9', title: 'Anime Dance', url: 'https://media.giphy.com/media/11sBLVxNs7v6WA/giphy.gif' },
+  { id: 'gif10', title: 'Marvel Hero', url: 'https://media.giphy.com/media/3oKIPa2TdahY8LAAxy/giphy.gif' }
 ];
 
 const EMOJI_CATEGORIES = [
@@ -23,6 +26,7 @@ const EMOJI_CATEGORIES = [
 export function DiscordSidebar({
   messages,
   onSendMessage,
+  onDeleteMessage,
   seatedUsers,
   currentUser,
   onTriggerReaction
@@ -35,13 +39,50 @@ export function DiscordSidebar({
   const [showImageModal, setShowImageModal] = useState(false);
   
   const [imageUrlInput, setImageUrlInput] = useState('');
-  const [gifSearch, setGifSearch] = useState('');
-  
+  const [gifSearchQuery, setGifSearchQuery] = useState('');
+  const [gifResults, setGifResults] = useState(INITIAL_GIFS);
+  const [isSearchingGifs, setIsSearchingGifs] = useState(false);
+
   const chatEndRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Live Giphy Search Handler
+  useEffect(() => {
+    if (!gifSearchQuery.trim()) {
+      setGifResults(INITIAL_GIFS);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setIsSearchingGifs(true);
+      try {
+        // Giphy Public Beta API Key search
+        const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=pL0W9BUtB7bM6ngRWBCLKRkUhFjvuaAr&limit=10&q=${encodeURIComponent(gifSearchQuery.trim())}`);
+        const data = await res.json();
+
+        if (data.data && data.data.length > 0) {
+          const fetchedGifs = data.data.map(item => ({
+            id: item.id,
+            title: item.title,
+            url: item.images.fixed_height.url
+          }));
+          setGifResults(fetchedGifs);
+        } else {
+          // Local filter fallback
+          setGifResults(INITIAL_GIFS.filter(g => g.title.toLowerCase().includes(gifSearchQuery.toLowerCase())));
+        }
+      } catch (err) {
+        setGifResults(INITIAL_GIFS.filter(g => g.title.toLowerCase().includes(gifSearchQuery.toLowerCase())));
+      } finally {
+        setIsSearchingGifs(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [gifSearchQuery]);
 
   const handleSendText = (e) => {
     e.preventDefault();
@@ -82,7 +123,6 @@ export function DiscordSidebar({
     onTriggerReaction(emoji);
   };
 
-  // Helper to render text with clickable links
   const renderMessageContent = (msg) => {
     if (msg.type === 'gif') {
       return (
@@ -95,12 +135,11 @@ export function DiscordSidebar({
     if (msg.type === 'image') {
       return (
         <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', maxWidth: '240px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <img src={msg.imageUrl} alt="Chat Attachment" style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
+          <img src={msg.imageUrl} alt="Attachment" style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
         </div>
       );
     }
 
-    // Auto link parsing
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const parts = (msg.text || '').split(urlRegex);
 
@@ -131,9 +170,7 @@ export function DiscordSidebar({
     ...user
   }));
 
-  const filteredGifs = gifSearch.trim()
-    ? QUICK_GIFS.filter(g => g.title.toLowerCase().includes(gifSearch.toLowerCase()))
-    : QUICK_GIFS;
+  const isAdmin = isAdminUser(currentUser);
 
   return (
     <div className="discord-sidebar">
@@ -175,15 +212,39 @@ export function DiscordSidebar({
                 );
               }
 
+              const canDelete = currentUser && (msg.user?.id === currentUser.id || isAdmin);
+
               return (
-                <div key={msg.id} className="chat-msg">
+                <div key={msg.id} className="chat-msg" style={{ position: 'relative', group: 'true' }}>
                   <img src={msg.user?.avatar} alt={msg.user?.username} className="chat-msg-avatar" />
-                  <div className="chat-msg-content">
-                    <div className="chat-msg-user">
-                      <span>{msg.user?.username}</span>
-                      {msg.seatCode && <span className="chat-msg-seat-tag">{msg.seatCode}</span>}
-                      <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{msg.time}</span>
+                  <div className="chat-msg-content" style={{ flex: 1 }}>
+                    <div className="chat-msg-user" style={{ justifyContent: 'space-between', width: '100%' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>{msg.user?.username}</span>
+                        {msg.seatCode && <span className="chat-msg-seat-tag">{msg.seatCode}</span>}
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{msg.time}</span>
+                      </div>
+
+                      {/* Delete Message Button for Message Owner or Admin */}
+                      {canDelete && (
+                        <button
+                          onClick={() => onDeleteMessage(msg.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#ef4444',
+                            cursor: 'pointer',
+                            padding: '2px 4px',
+                            opacity: 0.8,
+                            transition: 'opacity 0.2s ease'
+                          }}
+                          title="Mesajı Sil"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
                     </div>
+
                     {renderMessageContent(msg)}
                   </div>
                 </div>
@@ -192,31 +253,50 @@ export function DiscordSidebar({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Giphy GIF Picker Drawer */}
+          {/* Live Giphy GIF Search Drawer */}
           {showGifPicker && (
             <div style={{
               background: '#161b2e',
               borderTop: '1px solid var(--bg-card-border)',
               padding: '12px',
-              maxHeight: '220px',
+              maxHeight: '260px',
               overflowY: 'auto'
             }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--discord-blurple)' }}>GIPHY GIF Kütüphanesi</span>
+                <span style={{ fontSize: '0.75rem', fontWeight: 800, color: 'var(--discord-blurple)' }}>GIPHY GIF Arama</span>
                 <button onClick={() => setShowGifPicker(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                {filteredGifs.map((gif) => (
-                  <img
-                    key={gif.id}
-                    src={gif.url}
-                    alt={gif.title}
-                    onClick={() => handleSendGif(gif.url)}
-                    style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
-                  />
-                ))}
+              {/* Giphy Live Search Input */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <Search size={14} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  placeholder="GIF Ara... (Örn: popcorn, movie, anime, funny)"
+                  value={gifSearchQuery}
+                  onChange={(e) => setGifSearchQuery(e.target.value)}
+                  style={{ flex: 1, background: 'none', border: 'none', color: 'white', fontSize: '0.75rem', outline: 'none' }}
+                />
+                {gifSearchQuery && (
+                  <button onClick={() => setGifSearchQuery('')} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={12} /></button>
+                )}
               </div>
+
+              {isSearchingGifs ? (
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'center', padding: '12px' }}>GIPHY'de aranıyor...</div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                  {gifResults.map((gif) => (
+                    <img
+                      key={gif.id}
+                      src={gif.url}
+                      alt={gif.title}
+                      onClick={() => handleSendGif(gif.url)}
+                      style={{ width: '100%', height: '80px', objectFit: 'cover', borderRadius: '8px', cursor: 'pointer', border: '1px solid rgba(255,255,255,0.1)' }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 

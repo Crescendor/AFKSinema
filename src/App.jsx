@@ -23,11 +23,9 @@ export default function App() {
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const code = searchParams.get('code');
-
     const hash = window.location.hash;
 
     if (code) {
-      // Standard Authorization Code Flow
       exchangeCodeForUser(code).then((profile) => {
         if (profile) {
           setTempDiscordUser(profile);
@@ -36,7 +34,6 @@ export default function App() {
         }
       });
     } else if (hash && hash.includes('access_token')) {
-      // Fallback Implicit Grant Flow
       const params = new URLSearchParams(hash.substring(1));
       const token = params.get('access_token');
       if (token) {
@@ -102,6 +99,7 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
+  // Rich message handler (text, image, gif)
   const handleSendMessage = (msgData) => {
     if (!currentUser) {
       setIsLoginModalOpen(true);
@@ -123,6 +121,11 @@ export default function App() {
       ...msgData
     };
     setMessages(prev => [...prev, msg]);
+  };
+
+  // Delete message handler
+  const handleDeleteMessage = (msgId) => {
+    setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
   const handleTriggerReaction = (emoji) => {
@@ -225,6 +228,7 @@ export default function App() {
         <DiscordSidebar
           messages={messages}
           onSendMessage={handleSendMessage}
+          onDeleteMessage={handleDeleteMessage}
           seatedUsers={seatedUsers}
           currentUser={currentUser}
           onTriggerReaction={handleTriggerReaction}
