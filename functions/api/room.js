@@ -1,22 +1,22 @@
 // Cloudflare Pages Edge State Synchronizer: /api/room
 
-let globalRoomState = {
+let roomState = {
   broadcasterName: '',
   seatedUsers: {},
   messages: [],
   activeMola: null,
-  moviePosters: [],
+  moviePosters: null, // null means uninitialized, [] means cleared
   userSnacks: {},
   vipUsers: {},
   buffetItems: []
 };
 
 export async function onRequestGet(context) {
-  return new Response(JSON.stringify(globalRoomState), {
+  return new Response(JSON.stringify(roomState), {
     headers: {
       'Content-Type': 'application/json',
       'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache'
+      'Cache-Control': 'no-cache, no-store, must-revalidate'
     }
   });
 }
@@ -26,36 +26,40 @@ export async function onRequestPost(context) {
     const payload = await context.request.json();
     const { action, data } = payload;
 
-    if (action === 'SYNC_ALL') {
-      if (data.seatedUsers) globalRoomState.seatedUsers = data.seatedUsers;
-      if (data.messages) globalRoomState.messages = data.messages;
-      if (data.activeMola !== undefined) globalRoomState.activeMola = data.activeMola;
-      if (data.moviePosters) globalRoomState.moviePosters = data.moviePosters;
-      if (data.userSnacks) globalRoomState.userSnacks = data.userSnacks;
-      if (data.vipUsers) globalRoomState.vipUsers = data.vipUsers;
-      if (data.broadcasterName !== undefined) globalRoomState.broadcasterName = data.broadcasterName;
+    if (action === 'SYNC_STATE') {
+      if (data.seatedUsers !== undefined) roomState.seatedUsers = data.seatedUsers;
+      if (data.messages !== undefined) roomState.messages = data.messages;
+      if (data.activeMola !== undefined) roomState.activeMola = data.activeMola;
+      if (data.moviePosters !== undefined) roomState.moviePosters = data.moviePosters;
+      if (data.userSnacks !== undefined) roomState.userSnacks = data.userSnacks;
+      if (data.vipUsers !== undefined) roomState.vipUsers = data.vipUsers;
+      if (data.broadcasterName !== undefined) roomState.broadcasterName = data.broadcasterName;
     } else if (action === 'SEAT_OCCUPY') {
       const { seatCode, user } = data;
-      Object.keys(globalRoomState.seatedUsers).forEach(code => {
-        if (globalRoomState.seatedUsers[code].id === user.id) {
-          delete globalRoomState.seatedUsers[code];
+      // Remove user from any existing seat
+      Object.keys(roomState.seatedUsers).forEach(code => {
+        if (roomState.seatedUsers[code].id === user.id) {
+          delete roomState.seatedUsers[code];
         }
       });
-      globalRoomState.seatedUsers[seatCode] = user;
+      roomState.seatedUsers[seatCode] = user;
     } else if (action === 'SEND_CHAT') {
-      globalRoomState.messages.push(data);
-      if (globalRoomState.messages.length > 80) {
-        globalRoomState.messages.shift();
+      if (!Array.isArray(roomState.messages)) roomState.messages = [];
+      roomState.messages.push(data);
+      if (roomState.messages.length > 100) {
+        roomState.messages.shift();
       }
     } else if (action === 'DELETE_CHAT') {
-      globalRoomState.messages = globalRoomState.messages.filter(m => m.id !== data.msgId);
-    } else if (action === 'UPDATE_BROADCAST') {
-      globalRoomState.broadcasterName = data.broadcasterName;
+      if (Array.isArray(roomState.messages)) {
+        roomState.messages = roomState.messages.filter(m => m.id !== data.msgId);
+      }
     } else if (action === 'UPDATE_MOLA') {
-      globalRoomState.activeMola = data.activeMola;
+      roomState.activeMola = data.activeMola;
+    } else if (action === 'UPDATE_POSTERS') {
+      roomState.moviePosters = data.moviePosters;
     }
 
-    return new Response(JSON.stringify({ success: true, state: globalRoomState }), {
+    return new Response(JSON.stringify({ success: true, state: roomState }), {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*'

@@ -98,7 +98,7 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Movie Posters List
+  // Movie Posters List (with localStorage persistence)
   const [moviePosters, setMoviePosters] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_movie_posters');
@@ -131,22 +131,41 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // Real-Time Multi-User Room Polling (Every 2.5 seconds sync with Cloudflare Edge)
+  // Real-Time Multi-User Room Polling (Every 1.5 seconds sync with Cloudflare Edge)
   useEffect(() => {
     const syncRoom = async () => {
       try {
         const res = await fetch('/api/room');
         if (res.ok) {
           const room = await res.json();
-          if (room.seatedUsers && Object.keys(room.seatedUsers).length > 0) {
-            setSeatedUsers(prev => ({ ...prev, ...room.seatedUsers }));
+
+          // Sync Seated Users
+          if (room.seatedUsers && typeof room.seatedUsers === 'object') {
+            setSeatedUsers(prev => {
+              const merged = { ...prev, ...room.seatedUsers };
+              return JSON.stringify(merged) !== JSON.stringify(prev) ? merged : prev;
+            });
           }
-          if (room.messages && room.messages.length > 0) {
-            setMessages(room.messages);
+
+          // Sync Messages
+          if (Array.isArray(room.messages)) {
+            setMessages(prev => {
+              return JSON.stringify(room.messages) !== JSON.stringify(prev) ? room.messages : prev;
+            });
           }
+
+          // Sync Active Mola
           if (room.activeMola !== undefined) {
             setActiveMola(room.activeMola);
           }
+
+          // Sync Movie Posters (even when array is empty [])
+          if (Array.isArray(room.moviePosters)) {
+            setMoviePosters(prev => {
+              return JSON.stringify(room.moviePosters) !== JSON.stringify(prev) ? room.moviePosters : prev;
+            });
+          }
+
           if (room.broadcasterName !== undefined) {
             setBroadcasterName(room.broadcasterName);
           }
@@ -157,7 +176,7 @@ export default function App() {
     };
 
     syncRoom();
-    const interval = setInterval(syncRoom, 2500);
+    const interval = setInterval(syncRoom, 1500);
     return () => clearInterval(interval);
   }, []);
 
@@ -189,7 +208,7 @@ export default function App() {
     if (currentUser) {
       const isAlreadySeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
       if (!isAlreadySeated) {
-        setSeatedUsers(prev => ({ ...prev, A1: currentUser }));
+        handleSelectSeat('A1');
       }
     }
   }, [currentUser]);
@@ -320,6 +339,7 @@ export default function App() {
 
     setSeatedUsers(updated);
 
+    // Sync to Cloudflare
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -468,12 +488,29 @@ export default function App() {
     });
   };
 
+  // Synchronized Movie Poster Handlers
   const handleAddMoviePoster = (newPoster) => {
-    setMoviePosters(prev => [newPoster, ...prev]);
+    setMoviePosters(prev => {
+      const updated = [newPoster, ...prev];
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleDeleteMoviePoster = (posterId) => {
-    setMoviePosters(prev => prev.filter(p => p.id !== posterId));
+    setMoviePosters(prev => {
+      const updated = prev.filter(p => p.id !== posterId);
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleStartMola = (molaTitle) => {
@@ -537,6 +574,12 @@ export default function App() {
       delete updated[oldSeat];
       updated[newSeat] = targetUserObj;
       setSeatedUsers(updated);
+
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: newSeat, user: targetUserObj } })
+      }).catch(() => {});
 
       setMessages(prev => [...prev, {
         id: 'sys_' + Date.now(),
