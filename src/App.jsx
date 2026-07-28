@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { CinemaScreen } from './components/CinemaScreen';
 import { CinemaAuditorium } from './components/CinemaAuditorium';
 import { DiscordSidebar } from './components/DiscordSidebar';
-import { LeftCompactChat } from './components/LeftCompactChat';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
 import { LogIn } from 'lucide-react';
@@ -10,7 +9,7 @@ import { fetchDiscordUserProfile, isAdminUser } from './utils/discordAuth';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [tempDiscordUser, setTempDiscordUser] = useState(null); // Received from Discord OAuth
+  const [tempDiscordUser, setTempDiscordUser] = useState(null);
   const [seatedUsers, setSeatedUsers] = useState({});
   const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
@@ -89,7 +88,8 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  const handleSendMessage = (text) => {
+  // Rich message handler (text, image, gif)
+  const handleSendMessage = (msgData) => {
     if (!currentUser) {
       setIsLoginModalOpen(true);
       return;
@@ -106,8 +106,8 @@ export default function App() {
       id: 'msg_' + Date.now(),
       user: currentUser,
       seatCode: mySeat,
-      text,
-      time: timeStr
+      time: timeStr,
+      ...msgData
     };
     setMessages(prev => [...prev, msg]);
   };
@@ -184,14 +184,6 @@ export default function App() {
 
       {/* Main Body */}
       <div className="cinema-app-body">
-        {/* Left Compact Floating Chat */}
-        <LeftCompactChat
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          currentUser={currentUser}
-          onTriggerReaction={handleTriggerReaction}
-        />
-
         {/* Workspace: Screen + Auditorium */}
         <main className="cinema-hall-workspace" style={{ flex: 1 }}>
           <CinemaScreen
@@ -216,7 +208,7 @@ export default function App() {
           />
         </main>
 
-        {/* Discord Sidebar (Right - Audience & Voice Status) */}
+        {/* Discord Sidebar (Right - Rich Chat & Audience List) */}
         <DiscordSidebar
           messages={messages}
           onSendMessage={handleSendMessage}
