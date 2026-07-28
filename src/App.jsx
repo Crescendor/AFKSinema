@@ -4,12 +4,13 @@ import { CinemaAuditorium } from './components/CinemaAuditorium';
 import { DiscordSidebar } from './components/DiscordSidebar';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { AdminControlsModal } from './components/AdminControlsModal';
+import { AdminMasterPanelModal } from './components/AdminMasterPanelModal';
 import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { MolaModal } from './components/MolaModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { MovieBillboardLeft } from './components/MovieBillboardLeft';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, Coins } from 'lucide-react';
+import { LogIn, Coins, Shield } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -82,6 +83,7 @@ export default function App() {
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
   const [isMolaModalOpen, setIsMolaModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isAdminMasterOpen, setIsAdminMasterOpen] = useState(false);
 
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
@@ -94,7 +96,7 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Movie Posters List (with localStorage persistence)
+  // Movie Posters List
   const [moviePosters, setMoviePosters] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_movie_posters');
@@ -102,7 +104,7 @@ export default function App() {
     } catch (e) { return INITIAL_MOVIE_POSTERS; }
   });
 
-  // Economy, VIP & Snacks State (with localStorage persistence)
+  // Economy, VIP & Snacks State
   const [userCredits, setUserCredits] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_user_credits');
@@ -329,13 +331,11 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Nickname Update Handler
   const handleUpdateNickname = (newNickname) => {
     if (!currentUser) return;
     const updatedUser = { ...currentUser, username: newNickname };
     setCurrentUser(updatedUser);
 
-    // Update username in seatedUsers
     setSeatedUsers(prev => {
       const updated = { ...prev };
       Object.entries(updated).forEach(([code, u]) => {
@@ -353,11 +353,9 @@ export default function App() {
     }]);
   };
 
-  // Logout Handler
   const handleLogout = () => {
     if (currentUser) {
       const userId = currentUser.id;
-      // Remove from seat
       setSeatedUsers(prev => {
         const updated = { ...prev };
         Object.entries(updated).forEach(([code, u]) => {
@@ -373,7 +371,6 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
-  // Automatic Snack Purchase Handler (Left first, then Right)
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -427,7 +424,6 @@ export default function App() {
     });
   };
 
-  // Movie Poster Management Handlers
   const handleAddMoviePoster = (newPoster) => {
     setMoviePosters(prev => [newPoster, ...prev]);
   };
@@ -599,6 +595,17 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Admin Master Panel Button */}
+          {isAdmin && (
+            <button
+              className="btn-cinema"
+              onClick={() => setIsAdminMasterOpen(true)}
+              style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'black', fontWeight: 800, border: 'none' }}
+            >
+              <Shield size={16} color="black" /> 👑 Admin Paneli
+            </button>
+          )}
+
           {/* Credit Balance Badge */}
           {currentUser && (
             <div style={{
@@ -770,6 +777,28 @@ export default function App() {
         onGrantCredits={handleGrantCredits}
         onToggleVip={handleToggleVip}
         isTargetVip={adminModalUser && (vipUsers[adminModalUser.id] || isAdminUser(adminModalUser))}
+      />
+
+      {/* Unified Master Admin Panel Modal */}
+      <AdminMasterPanelModal
+        isOpen={isAdminMasterOpen}
+        onClose={() => setIsAdminMasterOpen(false)}
+        moviePosters={moviePosters}
+        onAddMoviePoster={handleAddMoviePoster}
+        onDeleteMoviePoster={handleDeleteMoviePoster}
+        activeMola={activeMola}
+        onStartMola={handleStartMola}
+        onEndMola={handleEndMola}
+        seatedUsers={seatedUsers}
+        availableSeats={availableSeats}
+        vipUsers={vipUsers}
+        onMoveUser={handleAdminMoveUser}
+        onKickUser={handleAdminKickUser}
+        onGrantCredits={handleGrantCredits}
+        onToggleVip={handleToggleVip}
+        buffetItems={buffetItems}
+        onAddBuffetItem={handleAddBuffetItem}
+        onDeleteBuffetItem={handleDeleteBuffetItem}
       />
     </div>
   );
