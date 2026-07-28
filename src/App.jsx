@@ -131,6 +131,36 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
+  // Real-Time Multi-User Room Polling (Every 2.5 seconds sync with Cloudflare Edge)
+  useEffect(() => {
+    const syncRoom = async () => {
+      try {
+        const res = await fetch('/api/room');
+        if (res.ok) {
+          const room = await res.json();
+          if (room.seatedUsers && Object.keys(room.seatedUsers).length > 0) {
+            setSeatedUsers(prev => ({ ...prev, ...room.seatedUsers }));
+          }
+          if (room.messages && room.messages.length > 0) {
+            setMessages(room.messages);
+          }
+          if (room.activeMola !== undefined) {
+            setActiveMola(room.activeMola);
+          }
+          if (room.broadcasterName !== undefined) {
+            setBroadcasterName(room.broadcasterName);
+          }
+        }
+      } catch (err) {
+        // Fallback for local dev
+      }
+    };
+
+    syncRoom();
+    const interval = setInterval(syncRoom, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
   useEffect(() => {
     if (currentUser) {
       localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
@@ -290,6 +320,13 @@ export default function App() {
 
     setSeatedUsers(updated);
 
+    // Sync to Cloudflare
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode, user: currentUser } })
+    }).catch(() => {});
+
     const newMsg = {
       id: 'sys_' + Date.now(),
       type: 'system',
@@ -323,6 +360,12 @@ export default function App() {
     if (oldSeatCode) delete updated[oldSeatCode];
     updated[seatToOccupy] = finalUser;
     setSeatedUsers(updated);
+
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: seatToOccupy, user: finalUser } })
+    }).catch(() => {});
 
     setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
@@ -438,6 +481,12 @@ export default function App() {
     const newMola = { title: molaTitle, startTime: Date.now() };
     setActiveMola(newMola);
 
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPDATE_MOLA', data: { activeMola: newMola } })
+    }).catch(() => {});
+
     setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
       type: 'system',
@@ -447,6 +496,12 @@ export default function App() {
 
   const handleEndMola = () => {
     setActiveMola(null);
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPDATE_MOLA', data: { activeMola: null } })
+    }).catch(() => {});
+
     setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
       type: 'system',
@@ -540,10 +595,23 @@ export default function App() {
       time: timeStr,
       ...msgData
     };
+
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SEND_CHAT', data: msg })
+    }).catch(() => {});
+
     setMessages(prev => [...prev, msg]);
   };
 
   const handleDeleteMessage = (msgId) => {
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'DELETE_CHAT', data: { msgId } })
+    }).catch(() => {});
+
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 

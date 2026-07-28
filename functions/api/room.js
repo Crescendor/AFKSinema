@@ -1,10 +1,14 @@
-// Cloudflare Pages Function: /api/room
-// Clean state with 0 dummy users and empty chat
+// Cloudflare Pages Edge State Synchronizer: /api/room
 
 let globalRoomState = {
-  broadcaster: null,
+  broadcasterName: '',
   seatedUsers: {},
-  messages: []
+  messages: [],
+  activeMola: null,
+  moviePosters: [],
+  userSnacks: {},
+  vipUsers: {},
+  buffetItems: []
 };
 
 export async function onRequestGet(context) {
@@ -22,7 +26,15 @@ export async function onRequestPost(context) {
     const payload = await context.request.json();
     const { action, data } = payload;
 
-    if (action === 'SEAT_OCCUPY') {
+    if (action === 'SYNC_ALL') {
+      if (data.seatedUsers) globalRoomState.seatedUsers = data.seatedUsers;
+      if (data.messages) globalRoomState.messages = data.messages;
+      if (data.activeMola !== undefined) globalRoomState.activeMola = data.activeMola;
+      if (data.moviePosters) globalRoomState.moviePosters = data.moviePosters;
+      if (data.userSnacks) globalRoomState.userSnacks = data.userSnacks;
+      if (data.vipUsers) globalRoomState.vipUsers = data.vipUsers;
+      if (data.broadcasterName !== undefined) globalRoomState.broadcasterName = data.broadcasterName;
+    } else if (action === 'SEAT_OCCUPY') {
       const { seatCode, user } = data;
       Object.keys(globalRoomState.seatedUsers).forEach(code => {
         if (globalRoomState.seatedUsers[code].id === user.id) {
@@ -32,11 +44,15 @@ export async function onRequestPost(context) {
       globalRoomState.seatedUsers[seatCode] = user;
     } else if (action === 'SEND_CHAT') {
       globalRoomState.messages.push(data);
-      if (globalRoomState.messages.length > 50) {
+      if (globalRoomState.messages.length > 80) {
         globalRoomState.messages.shift();
       }
+    } else if (action === 'DELETE_CHAT') {
+      globalRoomState.messages = globalRoomState.messages.filter(m => m.id !== data.msgId);
     } else if (action === 'UPDATE_BROADCAST') {
-      globalRoomState.broadcaster = data;
+      globalRoomState.broadcasterName = data.broadcasterName;
+    } else if (action === 'UPDATE_MOLA') {
+      globalRoomState.activeMola = data.activeMola;
     }
 
     return new Response(JSON.stringify({ success: true, state: globalRoomState }), {
