@@ -5,8 +5,9 @@ import { DiscordSidebar } from './components/DiscordSidebar';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { AdminControlsModal } from './components/AdminControlsModal';
 import { CinemaBuffetModal } from './components/CinemaBuffetModal';
+import { MolaModal } from './components/MolaModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, ShoppingBag, Coins, Star } from 'lucide-react';
+import { LogIn, ShoppingBag, Coins, Star, Heart } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -26,31 +27,55 @@ const INITIAL_BUFFET_ITEMS = [
   { id: 'b6', name: 'VIP Altın Mısır', price: 100, icon: '👑' }
 ];
 
-// Snack Expiry Duration: 20 Minutes (20 * 60 * 1000 ms)
-const SNACK_EXPIRY_MS = 20 * 60 * 1000;
+const SNACK_EXPIRY_MS = 20 * 60 * 1000; // 20 Minutes
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null);
+  // localStorage Persistence for User Session
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_current_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      return null;
+    }
+  });
+
   const [tempDiscordUser, setTempDiscordUser] = useState(null);
   const [seatedUsers, setSeatedUsers] = useState({});
   const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
+  const [isMolaModalOpen, setIsMolaModalOpen] = useState(false);
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
+
+  // Active Mola Intermission State: { title: string, startTime: number }
+  const [activeMola, setActiveMola] = useState(null);
 
   // Admin Control Modal State
   const [adminModalUser, setAdminModalUser] = useState(null);
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Economy, VIP & Snacks State
-  const [userCredits, setUserCredits] = useState({}); // { [userId]: number }
-  const [vipUsers, setVipUsers] = useState({}); // { [userId]: boolean }
-  const [userSnacks, setUserSnacks] = useState({}); // { [userId]: { left: { icon, expireTime }, right: { icon, expireTime } } }
+  // Economy, VIP & Snacks State (with localStorage persistence)
+  const [userCredits, setUserCredits] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_user_credits');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
+
+  const [vipUsers, setVipUsers] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_vip_users');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
+
+  const [userSnacks, setUserSnacks] = useState({});
   const [buffetItems, setBuffetItems] = useState(INITIAL_BUFFET_ITEMS);
 
   // Seat Change Anti-Spam Tracker & Ban List
@@ -59,6 +84,30 @@ export default function App() {
 
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
+
+  // Persist Current User to localStorage on update
+  useEffect(() => {
+    if (currentUser) {
+      localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('afk_current_user');
+    }
+  }, [currentUser]);
+
+  useEffect(() => {
+    localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
+  }, [userCredits]);
+
+  useEffect(() => {
+    localStorage.setItem('afk_vip_users', JSON.stringify(vipUsers));
+  }, [vipUsers]);
+
+  // If user is already logged in on refresh, assign to default seat
+  useEffect(() => {
+    if (currentUser && Object.keys(seatedUsers).length === 0) {
+      setSeatedUsers({ A1: currentUser });
+    }
+  }, []);
 
   // 10-Minute Loyalty Credit Interval (+20 for Standard, +50 for VIP)
   useEffect(() => {
@@ -110,7 +159,7 @@ export default function App() {
 
         return changed ? updated : prev;
       });
-    }, 15000); // Check every 15s
+    }, 15000);
 
     return () => clearInterval(expiryInterval);
   }, []);
@@ -229,8 +278,8 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Buffet Snack Purchase Handler (with 20-minute expiry)
-  const handleBuySnack = (userId, item, slot) => {
+  // Automatic Snack Purchase Handler (Left first, then Right)
+  const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
         ...prev,
@@ -242,11 +291,14 @@ export default function App() {
 
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
+      const isLeftEmpty = !existing.left || Date.now() > existing.left.expireTime;
+      const targetSlot = isLeftEmpty ? 'left' : 'right';
+
       return {
         ...prev,
         [userId]: {
           ...existing,
-          [slot]: { icon: item.icon, expireTime }
+          [targetSlot]: { icon: item.icon, expireTime }
         }
       };
     });
@@ -258,7 +310,6 @@ export default function App() {
     }]);
   };
 
-  // Popcorn Eating Consumption Handler
   const handleConsumePopcorn = () => {
     if (!currentUser) return;
     const userId = currentUser.id;
@@ -281,7 +332,27 @@ export default function App() {
     });
   };
 
-  // Admin VIP Toggle
+  // Admin Mola / Intermission Handlers
+  const handleStartMola = (molaTitle) => {
+    const newMola = { title: molaTitle, startTime: Date.now() };
+    setActiveMola(newMola);
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `☕ MOLA BAŞLADI: Admin "${molaTitle}" başlattı!`
+    }]);
+  };
+
+  const handleEndMola = () => {
+    setActiveMola(null);
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `🎬 MOLA BİTTİ: Sinema yayını devam ediyor!`
+    }]);
+  };
+
   const handleToggleVip = (userId) => {
     setVipUsers(prev => ({
       ...prev,
@@ -289,7 +360,6 @@ export default function App() {
     }));
   };
 
-  // Admin Grant Credits
   const handleGrantCredits = (userId, amount) => {
     setUserCredits(prev => ({
       ...prev,
@@ -425,15 +495,6 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Buffet Button */}
-          <button
-            className="btn-cinema primary"
-            onClick={() => setIsBuffetModalOpen(true)}
-            style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #d97706, #b45309)', borderColor: 'var(--accent-gold)' }}
-          >
-            <ShoppingBag size={16} /> Sinema Büfesi
-          </button>
-
           {/* Credit Balance Badge */}
           {currentUser && (
             <div style={{
@@ -492,6 +553,8 @@ export default function App() {
             broadcasterName={broadcasterName}
             setBroadcasterName={setBroadcasterName}
             currentUser={currentUser}
+            messages={messages}
+            activeMola={activeMola}
           />
 
           <CinemaAuditorium
@@ -510,6 +573,11 @@ export default function App() {
             mySeatCode={Object.keys(seatedUsers).find(k => seatedUsers[k].id === currentUser?.id)}
             mySnacks={mySnacks}
             onConsumePopcorn={handleConsumePopcorn}
+            onOpenBuffet={() => setIsBuffetModalOpen(true)}
+            onOpenMolaModal={() => setIsMolaModalOpen(true)}
+            activeMola={activeMola}
+            onEndMola={handleEndMola}
+            isAdmin={isAdmin}
           />
         </main>
 
@@ -525,8 +593,24 @@ export default function App() {
         />
       </div>
 
+      {/* Site Footer */}
+      <footer style={{
+        textAlign: 'center',
+        padding: '14px',
+        background: 'rgba(10, 4, 7, 0.95)',
+        borderTop: '1px solid var(--bg-card-border)',
+        fontSize: '0.82rem',
+        color: 'var(--text-muted)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '6px'
+      }}>
+        Dox tarafından AFK için Sevgiyle üretildi - 2026
+      </footer>
+
       <DiscordLoginModal
-        isOpen={!currentUser || isLoginModalOpen}
+        isOpen={!currentUser && isLoginModalOpen}
         onClose={() => {
           if (currentUser) setIsLoginModalOpen(false);
         }}
@@ -535,13 +619,11 @@ export default function App() {
         currentUser={currentUser}
       />
 
-      {/* Cinema Buffet Snack Shop Modal */}
       <CinemaBuffetModal
         isOpen={isBuffetModalOpen}
         onClose={() => setIsBuffetModalOpen(false)}
         currentUser={currentUser}
         userCredits={userCredits}
-        userSnacks={userSnacks}
         buffetItems={buffetItems}
         onBuySnack={handleBuySnack}
         onAddBuffetItem={handleAddBuffetItem}
@@ -549,7 +631,12 @@ export default function App() {
         isAdmin={isAdmin}
       />
 
-      {/* Admin Action Modal */}
+      <MolaModal
+        isOpen={isMolaModalOpen}
+        onClose={() => setIsMolaModalOpen(false)}
+        onStartMola={handleStartMola}
+      />
+
       <AdminControlsModal
         isOpen={isAdminModalOpen}
         onClose={() => setIsAdminModalOpen(false)}

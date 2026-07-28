@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShoppingBag, Coins, Plus, Trash2, Edit3, Check, X, Sparkles, Popcorn } from 'lucide-react';
+import { ShoppingBag, Coins, Plus, Trash2, X } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 
 export function CinemaBuffetModal({
@@ -7,7 +7,6 @@ export function CinemaBuffetModal({
   onClose,
   currentUser,
   userCredits,
-  userSnacks,
   buffetItems,
   onBuySnack,
   onAddBuffetItem,
@@ -18,12 +17,10 @@ export function CinemaBuffetModal({
   const [newItemName, setNewItemName] = useState('');
   const [newItemPrice, setNewItemPrice] = useState(30);
   const [newItemIcon, setNewItemIcon] = useState('🍿');
-  const [selectedSlot, setSelectedSlot] = useState('left'); // 'left' or 'right' side of avatar
 
   if (!isOpen) return null;
 
   const currentBalance = isAdmin ? Infinity : (userCredits[currentUser?.id] || 0);
-  const currentSnacks = userSnacks[currentUser?.id] || { left: null, right: null };
 
   const handleBuy = (item) => {
     if (!isAdmin && currentBalance < item.price) {
@@ -32,7 +29,7 @@ export function CinemaBuffetModal({
     }
 
     sounds.playPopcornCrunch();
-    onBuySnack(currentUser.id, item, selectedSlot);
+    onBuySnack(currentUser.id, item);
   };
 
   const handleAddItemSubmit = (e) => {
@@ -54,7 +51,7 @@ export function CinemaBuffetModal({
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '560px', padding: '28px' }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', padding: '28px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -73,18 +70,17 @@ export function CinemaBuffetModal({
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={20} /></button>
         </div>
 
-        {/* Credit Balance & Slot Picker */}
+        {/* Credit Balance */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
-          justify: 'space-between',
+          justifyContent: 'space-between',
           background: 'rgba(0,0,0,0.4)',
           border: '1px solid var(--bg-card-border)',
           borderRadius: '14px',
           padding: '12px 16px',
           marginBottom: '20px'
         }}>
-          {/* Balance */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <Coins size={20} color="var(--accent-gold)" />
             <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Bakiyeniz:</span>
@@ -93,52 +89,16 @@ export function CinemaBuffetModal({
             </span>
           </div>
 
-          {/* Slot selector: Left or Right of Avatar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
-            <span style={{ color: 'var(--text-muted)', fontWeight: 600 }}>Koyulacak Taraf:</span>
-            <button
-              onClick={() => setSelectedSlot('left')}
-              style={{
-                background: selectedSlot === 'left' ? 'var(--cinema-red)' : 'rgba(255,255,255,0.06)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 10px',
-                color: 'white',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              👈 Sol ({currentSnacks.left || 'Boş'})
-            </button>
-            <button
-              onClick={() => setSelectedSlot('right')}
-              style={{
-                background: selectedSlot === 'right' ? 'var(--cinema-red)' : 'rgba(255,255,255,0.06)',
-                border: 'none',
-                borderRadius: '6px',
-                padding: '4px 10px',
-                color: 'white',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              Sağ 👉 ({currentSnacks.right || 'Boş'})
-            </button>
-          </div>
-        </div>
-
-        {/* Admin Item Add Bar */}
-        {isAdmin && (
-          <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+          {isAdmin && (
             <button
               className="btn-cinema"
               onClick={() => setIsEditing(!isEditing)}
               style={{ padding: '6px 12px', fontSize: '0.78rem', background: 'rgba(251, 191, 36, 0.15)', borderColor: 'var(--accent-gold)', color: 'var(--accent-gold)' }}
             >
-              <Plus size={14} /> Admin: Yeni Ürün Ekle
+              <Plus size={14} /> Admin: Ürün Ekle
             </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Add Item Form */}
         {isAdmin && isEditing && (
@@ -156,7 +116,7 @@ export function CinemaBuffetModal({
               />
               <input
                 type="text"
-                placeholder="Ürün Adı (Örn: Cips)"
+                placeholder="Ürün Adı"
                 value={newItemName}
                 onChange={(e) => setNewItemName(e.target.value)}
                 style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 10px', color: 'white' }}
