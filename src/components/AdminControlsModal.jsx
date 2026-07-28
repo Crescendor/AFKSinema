@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, UserX, ArrowRightLeft, Clock, Ban, Check, X } from 'lucide-react';
+import { Shield, UserX, ArrowRightLeft, Coins, Ban, Check, X } from 'lucide-react';
 
 export function AdminControlsModal({
   isOpen,
@@ -8,10 +8,12 @@ export function AdminControlsModal({
   currentSeatCode,
   availableSeats,
   onMoveUser,
-  onKickUser
+  onKickUser,
+  onGrantCredits
 }) {
   const [selectedNewSeat, setSelectedNewSeat] = useState('');
-  const [kickDuration, setKickDuration] = useState('5'); // minutes or 'perm'
+  const [kickDuration, setKickDuration] = useState('5');
+  const [grantAmount, setGrantAmount] = useState(50);
 
   if (!isOpen || !targetUser) return null;
 
@@ -29,6 +31,15 @@ export function AdminControlsModal({
     onClose();
   };
 
+  const handleGrantCreditsSubmit = (e) => {
+    e.preventDefault();
+    const amount = parseInt(grantAmount);
+    if (!amount || amount <= 0) return;
+    onGrantCredits(targetUser.id, amount);
+    alert(`✅ ${targetUser.username} kullanıcısına ${amount} 🪙 Kredi tanımlandı!`);
+    onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
@@ -40,7 +51,7 @@ export function AdminControlsModal({
               <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.15rem', fontWeight: 800 }}>
                 {targetUser.username}
               </h3>
-              <span style={{ fontSize: '0.75rem', color: 'var(--discord-blurple)' }}>
+              <span style={{ fontSize: '0.75rem', color: 'var(--cinema-red)' }}>
                 Koltuk: {currentSeatCode} • {targetUser.role || 'İzleyici'}
               </span>
             </div>
@@ -49,9 +60,9 @@ export function AdminControlsModal({
         </div>
 
         {/* Section 1: Relocate User */}
-        <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+        <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
-            <ArrowRightLeft size={16} /> Kullanıcının Koltuğunu Değiştir
+            <ArrowRightLeft size={16} /> Koltuk Değiştir
           </div>
 
           <form onSubmit={handleMoveSubmit} style={{ display: 'flex', gap: '8px' }}>
@@ -68,7 +79,7 @@ export function AdminControlsModal({
                 fontSize: '0.85rem'
               }}
             >
-              <option value="">Hedef Boş Koltuk Seçin...</option>
+              <option value="">Hedef Boş Koltuk...</option>
               {availableSeats.map(seat => (
                 <option key={seat} value={seat}>Koltuk {seat}</option>
               ))}
@@ -79,14 +90,41 @@ export function AdminControlsModal({
           </form>
         </div>
 
-        {/* Section 2: Kick / Ban User */}
+        {/* Section 2: Grant Credits */}
+        <div style={{ background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+            <Coins size={16} /> Kullanıcıya Kredi Ver
+          </div>
+
+          <form onSubmit={handleGrantCreditsSubmit} style={{ display: 'flex', gap: '8px' }}>
+            <input
+              type="number"
+              placeholder="Miktar"
+              value={grantAmount}
+              onChange={(e) => setGrantAmount(e.target.value)}
+              style={{
+                flex: 1,
+                background: 'rgba(0,0,0,0.5)',
+                border: '1px solid rgba(255,255,255,0.15)',
+                borderRadius: '8px',
+                padding: '8px 12px',
+                color: 'white',
+                fontSize: '0.85rem'
+              }}
+            />
+            <button type="submit" className="btn-cinema primary" style={{ padding: '8px 14px', fontSize: '0.8rem', background: 'linear-gradient(135deg, #d97706, #b45309)' }}>
+              Kredi Tanımla
+            </button>
+          </form>
+        </div>
+
+        {/* Section 3: Kick / Ban User */}
         <div style={{ background: 'rgba(242,63,67,0.1)', border: '1px solid rgba(242,63,67,0.3)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--discord-red)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <UserX size={16} /> Kullanıcıyı Odadan At / Banla
           </div>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
-            <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Süre Seçimi:</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '6px' }}>
               {[
                 { label: '5 Dk', val: '5' },

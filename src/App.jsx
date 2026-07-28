@@ -4,8 +4,9 @@ import { CinemaAuditorium } from './components/CinemaAuditorium';
 import { DiscordSidebar } from './components/DiscordSidebar';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { AdminControlsModal } from './components/AdminControlsModal';
+import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, ShieldAlert, Ban } from 'lucide-react';
+import { LogIn, ShoppingBag, Coins, Crown } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -14,6 +15,15 @@ const ALL_SEAT_CODES = [
   'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10',
   'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10',
   'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10'
+];
+
+const INITIAL_BUFFET_ITEMS = [
+  { id: 'b1', name: 'Dev Boy Mısır', price: 50, icon: '🍿' },
+  { id: 'b2', name: 'Soğuk Kola', price: 30, icon: '🥤' },
+  { id: 'b3', name: 'Vanilyalı Dondurma', price: 40, icon: '🍦' },
+  { id: 'b4', name: 'Çikolata Barı', price: 25, icon: '🍫' },
+  { id: 'b5', name: 'Soğuk İçecek', price: 35, icon: '🍺' },
+  { id: 'b6', name: 'VIP Altın Mısır', price: 100, icon: '👑' }
 ];
 
 export default function App() {
@@ -25,6 +35,7 @@ export default function App() {
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(true);
+  const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
@@ -33,13 +44,38 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
-  // Seat Change Anti-Spam Tracker: { [userId]: { count: 0, resetTime: timestamp } }
-  const [seatChangeLimits, setSeatChangeLimits] = useState({});
+  // Credit System & Snacks State
+  const [userCredits, setUserCredits] = useState({}); // { [userId]: number }
+  const [userSnacks, setUserSnacks] = useState({}); // { [userId]: { left: '🍿', right: '🥤' } }
+  const [buffetItems, setBuffetItems] = useState(INITIAL_BUFFET_ITEMS);
 
-  // Banned / Kicked Users: { [userId]: { isPerm: boolean, until: timestamp } }
+  // Seat Change Anti-Spam Tracker & Ban List
+  const [seatChangeLimits, setSeatChangeLimits] = useState({});
   const [bannedUsers, setBannedUsers] = useState({});
 
   const isAdmin = isAdminUser(currentUser);
+
+  // 10-Minute Loyalty Credit Interval (+20 Credits every 10 Mins)
+  useEffect(() => {
+    const creditTimer = setInterval(() => {
+      if (currentUser && !isAdmin) {
+        setUserCredits(prev => {
+          const currentBal = prev[currentUser.id] || 50; // Starting credit 50
+          const updatedBal = currentBal + 20;
+          
+          setMessages(prevMsgs => [...prevMsgs, {
+            id: 'sys_' + Date.now(),
+            type: 'system',
+            text: `🪙 SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+          }]);
+
+          return { ...prev, [currentUser.id]: updatedBal };
+        });
+      }
+    }, 10 * 60 * 1000);
+
+    return () => clearInterval(creditTimer);
+  }, [currentUser, isAdmin]);
 
   // Check URL Search Params for ?code= OR Hash for #access_token=
   useEffect(() => {
@@ -70,7 +106,6 @@ export default function App() {
     }
   }, []);
 
-  // Seat Selection with Anti-Spam Cooldown Enforcement (10 changes / 10 mins)
   const handleSelectSeat = (seatCode) => {
     if (!currentUser) {
       setTargetSeatCode(seatCode);
@@ -78,23 +113,18 @@ export default function App() {
       return;
     }
 
-    // Check if user is currently banned
     const userBan = bannedUsers[currentUser.id];
-    if (userBan) {
-      if (userBan.isPerm || Date.now() < userBan.until) {
-        alert('⛔ SİNEMADAN UZAKLAŞTIRILDINIZ:\nBu sinema salonundan geçici veya kalıcı olarak uzaklaştırıldınız.');
-        return;
-      }
+    if (userBan && (userBan.isPerm || Date.now() < userBan.until)) {
+      alert('⛔ SİNEMADAN UZAKLAŞTIRILDINIZ: Bu sinema salonundan uzaklaştırıldınız.');
+      return;
     }
 
-    // Non-Admin Seat Change Cooldown Enforcement
     if (!isAdmin) {
       const userId = currentUser.id;
       const now = Date.now();
       const userLimit = seatChangeLimits[userId] || { count: 0, resetTime: now + (10 * 60 * 1000) };
 
       if (now > userLimit.resetTime) {
-        // Cooldown window expired, reset count
         seatChangeLimits[userId] = { count: 1, resetTime: now + (10 * 60 * 1000) };
       } else {
         if (userLimit.count >= 10) {
@@ -127,7 +157,6 @@ export default function App() {
   };
 
   const handleLogin = (finalUser) => {
-    // Check if user is banned
     const userBan = bannedUsers[finalUser.id];
     if (userBan && (userBan.isPerm || Date.now() < userBan.until)) {
       alert('⛔ UZAKLAŞTIRILDINIZ: Bu kullanıcı sinema salonundan uzaklaştırılmıştır.');
@@ -136,6 +165,11 @@ export default function App() {
 
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
+
+    // Initial 50 credits for new user
+    if (!userCredits[finalUser.id]) {
+      setUserCredits(prev => ({ ...prev, [finalUser.id]: 50 }));
+    }
 
     const seatToOccupy = targetSeatCode || 'A1';
     
@@ -158,7 +192,50 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Admin Handler: Move any user to a new seat
+  // Buffet Snack Purchase Handler
+  const handleBuySnack = (userId, item, slot) => {
+    if (!isAdmin) {
+      setUserCredits(prev => ({
+        ...prev,
+        [userId]: (prev[userId] || 50) - item.price
+      }));
+    }
+
+    setUserSnacks(prev => {
+      const existing = prev[userId] || { left: null, right: null };
+      return {
+        ...prev,
+        [userId]: {
+          ...existing,
+          [slot]: item.icon
+        }
+      };
+    });
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı!`
+    }]);
+  };
+
+  // Admin Grant Credits
+  const handleGrantCredits = (userId, amount) => {
+    setUserCredits(prev => ({
+      ...prev,
+      [userId]: (prev[userId] || 50) + amount
+    }));
+  };
+
+  // Admin Buffet Item Handlers
+  const handleAddBuffetItem = (item) => {
+    setBuffetItems(prev => [...prev, item]);
+  };
+
+  const handleDeleteBuffetItem = (itemId) => {
+    setBuffetItems(prev => prev.filter(i => i.id !== itemId));
+  };
+
   const handleAdminMoveUser = (userId, oldSeat, newSeat) => {
     const updated = { ...seatedUsers };
     const targetUserObj = updated[oldSeat];
@@ -175,7 +252,6 @@ export default function App() {
     }
   };
 
-  // Admin Handler: Kick or Permanent Ban user
   const handleAdminKickUser = (targetUser, durationMinutes, isPerm) => {
     const userId = targetUser.id;
     const until = isPerm ? 0 : Date.now() + (durationMinutes * 60 * 1000);
@@ -185,14 +261,12 @@ export default function App() {
       [userId]: { isPerm, until }
     }));
 
-    // Clear user seat if currently sitting
     const updated = { ...seatedUsers };
     Object.entries(updated).forEach(([code, u]) => {
       if (u.id === userId) delete updated[code];
     });
     setSeatedUsers(updated);
 
-    // If target user is the logged in user, log out
     if (currentUser && currentUser.id === userId) {
       setCurrentUser(null);
       setIsLoginModalOpen(true);
@@ -266,6 +340,7 @@ export default function App() {
   };
 
   const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
+  const currentCreditBalance = currentUser ? (isAdmin ? '∞' : (userCredits[currentUser.id] || 50)) : 0;
 
   return (
     <div className={`app-container ${lightsDimmed ? 'lights-dimmed' : ''}`}>
@@ -274,12 +349,39 @@ export default function App() {
         <div className="logo-section">
           <span style={{ fontSize: '1.5rem' }}>🍿</span>
           <span style={{ background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            AFK<span style={{ color: 'var(--discord-blurple)', WebkitTextFillColor: 'var(--discord-blurple)' }}>Sinema</span>
+            AFK<span style={{ color: 'var(--cinema-red)', WebkitTextFillColor: 'var(--cinema-red)' }}>Sinema</span>
           </span>
           <span className="logo-badge">Discord Cinema</span>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Buffet Button */}
+          <button
+            className="btn-cinema primary"
+            onClick={() => setIsBuffetModalOpen(true)}
+            style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #d97706, #b45309)', borderColor: 'var(--accent-gold)' }}
+          >
+            <ShoppingBag size={16} /> Sinema Büfesi
+          </button>
+
+          {/* Credit Balance Badge */}
+          {currentUser && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid rgba(251, 191, 36, 0.4)',
+              padding: '6px 12px',
+              borderRadius: '20px',
+              fontSize: '0.82rem',
+              fontWeight: 800,
+              color: 'var(--accent-gold)'
+            }}>
+              <Coins size={16} /> {currentCreditBalance} Kredi
+            </div>
+          )}
+
           {currentUser ? (
             <div 
               onClick={() => setIsLoginModalOpen(true)}
@@ -287,8 +389,8 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                background: 'rgba(88, 101, 242, 0.15)',
-                border: '1px solid rgba(88, 101, 242, 0.4)',
+                background: 'rgba(225, 29, 72, 0.15)',
+                border: '1px solid rgba(225, 29, 72, 0.4)',
                 padding: '4px 12px',
                 borderRadius: '30px',
                 cursor: 'pointer'
@@ -324,6 +426,7 @@ export default function App() {
 
           <CinemaAuditorium
             seatedUsers={seatedUsers}
+            userSnacks={userSnacks}
             currentUser={currentUser}
             onSelectSeat={handleSelectSeat}
             onOpenLoginModal={(seat) => { setTargetSeatCode(seat); setIsLoginModalOpen(true); }}
@@ -359,6 +462,20 @@ export default function App() {
         currentUser={currentUser}
       />
 
+      {/* Cinema Buffet Snack Shop Modal */}
+      <CinemaBuffetModal
+        isOpen={isBuffetModalOpen}
+        onClose={() => setIsBuffetModalOpen(false)}
+        currentUser={currentUser}
+        userCredits={userCredits}
+        userSnacks={userSnacks}
+        buffetItems={buffetItems}
+        onBuySnack={handleBuySnack}
+        onAddBuffetItem={handleAddBuffetItem}
+        onDeleteBuffetItem={handleDeleteBuffetItem}
+        isAdmin={isAdmin}
+      />
+
       {/* Admin Action Modal for User Management & Relocation */}
       <AdminControlsModal
         isOpen={isAdminModalOpen}
@@ -368,6 +485,7 @@ export default function App() {
         availableSeats={availableSeats}
         onMoveUser={handleAdminMoveUser}
         onKickUser={handleAdminKickUser}
+        onGrantCredits={handleGrantCredits}
       />
     </div>
   );

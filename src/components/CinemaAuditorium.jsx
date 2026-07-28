@@ -13,6 +13,7 @@ const ROWS = [
 
 export function CinemaAuditorium({
   seatedUsers,
+  userSnacks = {},
   currentUser,
   onSelectSeat,
   onOpenLoginModal,
@@ -24,7 +25,6 @@ export function CinemaAuditorium({
     const seatCode = `${rowId}${seatNum}`;
     const occupant = seatedUsers[seatCode];
 
-    // If Admin clicks on an occupied seat (of someone else), open Admin controls for that user!
     if (isAdmin && occupant && occupant.id !== currentUser.id) {
       onOpenAdminModal(occupant, seatCode);
       return;
@@ -59,12 +59,12 @@ export function CinemaAuditorium({
         border: '1px solid rgba(255,255,255,0.06)'
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <Armchair size={14} color="var(--discord-blurple)" />
+          <Armchair size={14} color="var(--cinema-red)" />
           <span>Doluluk: <strong style={{ color: 'white' }}>{occupiedCount}</strong> / 48 Koltuk</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <Crown size={14} color="var(--accent-gold)" />
-          <span>VIP Deri Koltuklar: Sıra A</span>
+          <span>VIP Kadife Koltuklar: Sıra A</span>
         </div>
       </div>
 
@@ -81,6 +81,8 @@ export function CinemaAuditorium({
               const isMySeat = currentUser && occupant && occupant.id === currentUser.id;
               const isVip = row.isVip;
 
+              const snacks = occupant ? (userSnacks[occupant.id] || {}) : {};
+
               let seatClass = 'cinema-seat';
               if (isVip) seatClass += ' vip';
               if (occupant) seatClass += ' occupied';
@@ -94,13 +96,42 @@ export function CinemaAuditorium({
                 >
                   <div className="seat-headrest" />
 
-                  {occupant ? (
-                    <div className="seat-avatar-wrapper">
-                      <img src={occupant.avatar} alt={occupant.username} className="seat-avatar-img" />
-                    </div>
-                  ) : (
-                    <span className="seat-number">{seatCode}</span>
+                  {/* Left & Right Buffet Snack Items beside Avatar */}
+                  {occupant && (
+                    <>
+                      {snacks.left && (
+                        <div style={{
+                          position: 'absolute',
+                          left: '-14px',
+                          top: '-10px',
+                          fontSize: '1rem',
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
+                          zIndex: 15
+                        }}>
+                          {snacks.left}
+                        </div>
+                      )}
+
+                      <div className="seat-avatar-wrapper">
+                        <img src={occupant.avatar} alt={occupant.username} className="seat-avatar-img" />
+                      </div>
+
+                      {snacks.right && (
+                        <div style={{
+                          position: 'absolute',
+                          right: '-14px',
+                          top: '-10px',
+                          fontSize: '1rem',
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
+                          zIndex: 15
+                        }}>
+                          {snacks.right}
+                        </div>
+                      )}
+                    </>
                   )}
+
+                  {!occupant && <span className="seat-number">{seatCode}</span>}
 
                   {/* Seat Hover Tooltip */}
                   <div className="seat-tooltip">
@@ -113,6 +144,11 @@ export function CinemaAuditorium({
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           Koltuk {seatCode} {isVip ? '• VIP Lounge' : ''}
                         </div>
+                        {(snacks.left || snacks.right) && (
+                          <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', marginTop: '2px' }}>
+                            🍿 İkramlar: {snacks.left || ''} {snacks.right || ''}
+                          </div>
+                        )}
                         {isAdmin && !isMySeat && (
                           <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', marginTop: '2px', fontWeight: 700 }}>
                             👑 Tıkla: Koltuk Değiştir / At
@@ -122,7 +158,7 @@ export function CinemaAuditorium({
                     ) : (
                       <div>
                         <div style={{ fontWeight: '700' }}>Koltuk {seatCode} (Boş)</div>
-                        <div style={{ fontSize: '0.7rem', color: 'var(--discord-blurple)' }}>Oturmak için tıkla</div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--cinema-red)' }}>Oturmak için tıkla</div>
                       </div>
                     )}
                   </div>
