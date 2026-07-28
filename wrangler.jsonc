@@ -2,8 +2,5 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "afksinema",
   "pages_build_output_dir": "./dist",
-  "compatibility_date": "2026-07-29",
-  "site": {
-    "bucket": "./dist"
-  }
+  "compatibility_date": "2026-07-29"
 }
