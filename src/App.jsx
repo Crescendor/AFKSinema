@@ -5,7 +5,7 @@ import { DiscordSidebar } from './components/DiscordSidebar';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
 import { LogIn } from 'lucide-react';
-import { fetchDiscordUserProfile, isAdminUser } from './utils/discordAuth';
+import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -19,10 +19,24 @@ export default function App() {
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
-  // Check URL Hash for Discord OAuth Callback (#access_token=...)
+  // Check URL Search Params for ?code= OR Hash for #access_token=
   useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+
     const hash = window.location.hash;
-    if (hash && hash.includes('access_token')) {
+
+    if (code) {
+      // Standard Authorization Code Flow
+      exchangeCodeForUser(code).then((profile) => {
+        if (profile) {
+          setTempDiscordUser(profile);
+          setIsLoginModalOpen(true);
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+      });
+    } else if (hash && hash.includes('access_token')) {
+      // Fallback Implicit Grant Flow
       const params = new URLSearchParams(hash.substring(1));
       const token = params.get('access_token');
       if (token) {
@@ -88,7 +102,6 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Rich message handler (text, image, gif)
   const handleSendMessage = (msgData) => {
     if (!currentUser) {
       setIsLoginModalOpen(true);
