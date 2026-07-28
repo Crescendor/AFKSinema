@@ -320,7 +320,6 @@ export default function App() {
 
     setSeatedUsers(updated);
 
-    // Sync to Cloudflare
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -657,7 +656,7 @@ export default function App() {
       {/* Header */}
       <header className="app-header">
         <div className="logo-section">
-          <span style={{ fontSize: '1.5rem' }}>🍿</span>
+          <img src="/afk_logo.png" alt="AFK Sinema Logo" style={{ height: '36px', borderRadius: '8px', border: '1px solid rgba(225,29,72,0.4)' }} />
           <span style={{ background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
             AFK<span style={{ color: 'var(--cinema-red)', WebkitTextFillColor: 'var(--cinema-red)' }}>Sinema</span>
           </span>
