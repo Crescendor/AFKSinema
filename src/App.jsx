@@ -5,43 +5,21 @@ import { DiscordSidebar } from './components/DiscordSidebar';
 import { LeftCompactChat } from './components/LeftCompactChat';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, Crown, Shield } from 'lucide-react';
+import { LogIn } from 'lucide-react';
 import { fetchDiscordUserProfile, isAdminUser } from './utils/discordAuth';
 
-const DEFAULT_USERS = {
-  'A4': {
-    id: '102225960337670144',
-    username: 'Burak',
-    discriminator: '0',
-    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&q=80',
-    role: 'VIP Admin Streamer',
-    badge: '👑 Admin',
-    isAdmin: true
-  },
-  'B5': {
-    id: '269639754675519489',
-    username: 'Yayıncı Admin',
-    discriminator: '0',
-    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&q=80',
-    role: 'Yayın Yetkilisi',
-    badge: '👑 Admin',
-    isAdmin: true
-  }
-};
-
 const INITIAL_MESSAGES = [
-  { id: 'msg_1', type: 'system', text: 'AFKSinema perdesi yayına hazır! Yetkili Adminler Discord ekranını yansıtabilir.' },
-  { id: 'msg_2', user: DEFAULT_USERS['A4'], seatCode: 'A4', text: 'Yayın butonuna tıklayıp ekranımı açıyorum 🍿', time: '01:20' }
+  { id: 'msg_1', type: 'system', text: 'AFKSinema perdesine hoş geldiniz! Lütfen Discord hesabınızla giriş yapın.' }
 ];
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(DEFAULT_USERS['A4']);
-  const [seatedUsers, setSeatedUsers] = useState(DEFAULT_USERS);
+  const [currentUser, setCurrentUser] = useState(null); // No pre-filled prop user!
+  const [seatedUsers, setSeatedUsers] = useState({}); // Empty cinema seats initial state!
   const [messages, setMessages] = useState(INITIAL_MESSAGES);
   const [broadcasterName, setBroadcasterName] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true); // Mandatory Discord Login screen on start!
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
@@ -55,14 +33,16 @@ export default function App() {
         fetchDiscordUserProfile(token).then((profile) => {
           if (profile) {
             setCurrentUser(profile);
+            setIsLoginModalOpen(false);
             window.history.replaceState(null, '', window.location.pathname);
-            // Seat user
-            const seatCode = 'A5';
+            
+            // Auto seat on VIP A1
+            const seatCode = 'A1';
             setSeatedUsers(prev => ({ ...prev, [seatCode]: profile }));
             setMessages(prev => [...prev, {
               id: 'sys_' + Date.now(),
               type: 'system',
-              text: `${profile.username} gerçek Discord hesabı ile katıldı!`
+              text: `${profile.username} (${profile.badge}) salona katıldı ve ${seatCode} koltuğuna oturdu 🍿`
             }]);
           }
         });
@@ -98,10 +78,12 @@ export default function App() {
 
   const handleLogin = (user) => {
     setCurrentUser(user);
-    if (targetSeatCode) {
-      handleSelectSeat(targetSeatCode);
-      setTargetSeatCode(null);
-    }
+    setIsLoginModalOpen(false);
+
+    // Auto place on selected seat or VIP A1
+    const seatToOccupy = targetSeatCode || 'A1';
+    handleSelectSeat(seatToOccupy);
+    setTargetSeatCode(null);
   };
 
   const handleSendMessage = (text) => {
@@ -243,7 +225,9 @@ export default function App() {
 
       <DiscordLoginModal
         isOpen={isLoginModalOpen}
-        onClose={() => setIsLoginModalOpen(false)}
+        onClose={() => {
+          if (currentUser) setIsLoginModalOpen(false);
+        }}
         onLogin={handleLogin}
         currentUser={currentUser}
       />
