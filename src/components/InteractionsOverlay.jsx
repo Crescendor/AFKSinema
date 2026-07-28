@@ -1,6 +1,6 @@
 import React from 'react';
 import confetti from 'canvas-confetti';
-import { ShoppingBag, Coffee } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 
 export function InteractionsOverlay({
@@ -9,11 +9,7 @@ export function InteractionsOverlay({
   mySeatCode,
   mySnacks = {},
   onConsumePopcorn,
-  onOpenBuffet,
-  onOpenMolaModal,
-  activeMola,
-  onEndMola,
-  isAdmin
+  onOpenBuffet
 }) {
   const handleConfetti = () => {
     sounds.playApplause();
@@ -55,7 +51,7 @@ export function InteractionsOverlay({
 
       {/* Quick Control Deck under Cinema Auditorium */}
       <div className="cinema-controls-deck" style={{ position: 'relative', zIndex: 45 }}>
-        {/* Buffet Button placed directly in quick action bar */}
+        {/* Buffet Button */}
         <button
           className="btn-cinema primary"
           onClick={onOpenBuffet}
@@ -93,27 +89,6 @@ export function InteractionsOverlay({
         <button className="btn-cinema primary" onClick={handleConfetti} style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: 'black' }}>
           🎉 Konfeti Patlat!
         </button>
-
-        {/* Admin Mola / Intermission Trigger */}
-        {isAdmin && (
-          activeMola ? (
-            <button
-              className="btn-cinema"
-              onClick={onEndMola}
-              style={{ background: '#ef4444', color: 'white', borderColor: '#ef4444' }}
-            >
-              ☕ Molayı Bitir
-            </button>
-          ) : (
-            <button
-              className="btn-cinema"
-              onClick={onOpenMolaModal}
-              style={{ background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
-            >
-              <Coffee size={16} /> ☕ Mola Ver
-            </button>
-          )
-        )}
       </div>
     </>
   );

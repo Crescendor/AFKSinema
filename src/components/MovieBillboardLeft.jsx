@@ -1,47 +1,7 @@
-import React, { useState } from 'react';
-import { Film, Plus, Trash2, Calendar } from 'lucide-react';
+import React from 'react';
+import { Film, Calendar } from 'lucide-react';
 
-export function MovieBillboardLeft({
-  moviePosters,
-  onAddMoviePoster,
-  onDeleteMoviePoster,
-  isAdmin
-}) {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [title, setTitle] = useState('');
-  const [imageUrl, setImageUrl] = useState('');
-  const [releaseDate, setReleaseDate] = useState('29 Temmuz 2026');
-  const [status, setStatus] = useState('Oynatılıyor');
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (uploadEvent) => {
-        setImageUrl(uploadEvent.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleAddSubmit = (e) => {
-    e.preventDefault();
-    if (!title.trim() || !imageUrl.trim()) return;
-
-    const newPoster = {
-      id: 'poster_' + Date.now(),
-      title: title.trim(),
-      imageUrl: imageUrl.trim(),
-      releaseDate: releaseDate.trim() || 'Çok Yakında',
-      status
-    };
-
-    onAddMoviePoster(newPoster);
-    setTitle('');
-    setImageUrl('');
-    setIsAddModalOpen(false);
-  };
-
+export function MovieBillboardLeft({ moviePosters }) {
   return (
     <div style={{
       width: '260px',
@@ -55,114 +15,14 @@ export function MovieBillboardLeft({
       overflowY: 'auto'
     }}>
       {/* Panel Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Film size={18} color="var(--cinema-red)" />
-          <span style={{ fontWeight: 800, fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>
-            Vizyondaki Filmler
-          </span>
-        </div>
-
-        {isAdmin && (
-          <button
-            onClick={() => setIsAddModalOpen(!isAddModalOpen)}
-            style={{
-              background: 'rgba(225, 29, 72, 0.2)',
-              border: '1px solid var(--cinema-red)',
-              color: 'white',
-              borderRadius: '6px',
-              padding: '4px 8px',
-              fontSize: '0.7rem',
-              fontWeight: 800,
-              cursor: 'pointer'
-            }}
-            title="Film Afişi Ekle"
-          >
-            + Afiş Ekle
-          </button>
-        )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+        <Film size={18} color="var(--cinema-red)" />
+        <span style={{ fontWeight: 800, fontSize: '0.9rem', fontFamily: 'var(--font-heading)' }}>
+          Vizyondaki Filmler
+        </span>
       </div>
 
-      {/* Admin Add Poster Drawer */}
-      {isAdmin && isAddModalOpen && (
-        <form onSubmit={handleAddSubmit} style={{ background: 'rgba(0,0,0,0.4)', padding: '12px', borderRadius: '12px', marginBottom: '16px', border: '1px border var(--cinema-red)' }}>
-          <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '8px' }}>
-            👑 Yeni Film Afişi Ekle
-          </div>
-
-          <input
-            type="text"
-            placeholder="Film Adı"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.75rem', marginBottom: '6px' }}
-          />
-
-          <input
-            type="text"
-            placeholder="Gösterim Tarihi (Örn: 29 Temmuz 2026)"
-            value={releaseDate}
-            onChange={(e) => setReleaseDate(e.target.value)}
-            style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.75rem', marginBottom: '6px' }}
-          />
-
-          <label className="btn-cinema" style={{ display: 'flex', justifyContent: 'center', marginBottom: '6px', padding: '4px', fontSize: '0.7rem', cursor: 'pointer' }}>
-            📷 Görsel Seç
-            <input type="file" accept="image/*" onChange={handleFileUpload} style={{ display: 'none' }} />
-          </label>
-
-          <input
-            type="url"
-            placeholder="Veya Görsel URL Yapıştır"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-            style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.75rem', marginBottom: '8px' }}
-          />
-
-          <div style={{ display: 'flex', gap: '6px', marginBottom: '10px' }}>
-            <button
-              type="button"
-              onClick={() => setStatus('Oynatılıyor')}
-              style={{
-                flex: 1,
-                background: status === 'Oynatılıyor' ? 'var(--cinema-red)' : 'rgba(0,0,0,0.4)',
-                border: 'none',
-                color: 'white',
-                padding: '4px',
-                borderRadius: '6px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              🎥 Oynatılıyor
-            </button>
-            <button
-              type="button"
-              onClick={() => setStatus('Yakında')}
-              style={{
-                flex: 1,
-                background: status === 'Yakında' ? 'var(--accent-gold)' : 'rgba(0,0,0,0.4)',
-                border: 'none',
-                color: status === 'Yakında' ? 'black' : 'white',
-                padding: '4px',
-                borderRadius: '6px',
-                fontSize: '0.7rem',
-                fontWeight: 700,
-                cursor: 'pointer'
-              }}
-            >
-              🍿 Yakında
-            </button>
-          </div>
-
-          <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '6px', fontSize: '0.75rem', justifyContent: 'center' }}>
-            Afişi Yayınla
-          </button>
-        </form>
-      )}
-
-      {/* Posters Grid */}
+      {/* Posters List */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {moviePosters.map((poster) => (
           <div
@@ -191,31 +51,6 @@ export function MovieBillboardLeft({
             }}>
               {poster.status === 'Oynatılıyor' ? '🎥 OYNATILIYOR' : '🍿 YAKINDA'}
             </div>
-
-            {isAdmin && (
-              <button
-                onClick={() => onDeleteMoviePoster(poster.id)}
-                style={{
-                  position: 'absolute',
-                  top: '8px',
-                  right: '8px',
-                  background: 'rgba(0,0,0,0.7)',
-                  border: 'none',
-                  color: '#ef4444',
-                  borderRadius: '50%',
-                  width: '24px',
-                  height: '24px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  cursor: 'pointer',
-                  zIndex: 5
-                }}
-                title="Afişi Sil"
-              >
-                <Trash2 size={12} />
-              </button>
-            )}
 
             {/* Poster Image */}
             <img
