@@ -9,13 +9,14 @@ import { LogIn } from 'lucide-react';
 import { fetchDiscordUserProfile, isAdminUser } from './utils/discordAuth';
 
 export default function App() {
-  const [currentUser, setCurrentUser] = useState(null); // Strictly null initial state
-  const [seatedUsers, setSeatedUsers] = useState({}); // Strictly empty initial seats
-  const [messages, setMessages] = useState([]); // Strictly empty chat
+  const [currentUser, setCurrentUser] = useState(null);
+  const [tempDiscordUser, setTempDiscordUser] = useState(null); // Received from Discord OAuth
+  const [seatedUsers, setSeatedUsers] = useState({});
+  const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true); // Always open landing modal
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(true);
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
 
@@ -28,17 +29,9 @@ export default function App() {
       if (token) {
         fetchDiscordUserProfile(token).then((profile) => {
           if (profile) {
-            setCurrentUser(profile);
-            setIsLoginModalOpen(false);
+            setTempDiscordUser(profile);
+            setIsLoginModalOpen(true);
             window.history.replaceState(null, '', window.location.pathname);
-
-            const seatCode = 'A1';
-            setSeatedUsers(prev => ({ ...prev, [seatCode]: profile }));
-            setMessages(prev => [...prev, {
-              id: 'sys_' + Date.now(),
-              type: 'system',
-              text: `${profile.username} salona katıldı!`
-            }]);
           }
         });
       }
@@ -71,12 +64,28 @@ export default function App() {
     setMessages(prev => [...prev, newMsg]);
   };
 
-  const handleLogin = (user) => {
-    setCurrentUser(user);
+  const handleLogin = (finalUser) => {
+    setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
 
     const seatToOccupy = targetSeatCode || 'A1';
-    handleSelectSeat(seatToOccupy);
+    
+    let oldSeatCode = null;
+    Object.entries(seatedUsers).forEach(([code, u]) => {
+      if (u.id === finalUser.id) oldSeatCode = code;
+    });
+
+    const updated = { ...seatedUsers };
+    if (oldSeatCode) delete updated[oldSeatCode];
+    updated[seatToOccupy] = finalUser;
+    setSeatedUsers(updated);
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `${finalUser.username} salona katıldı ve ${seatToOccupy} koltuğuna oturdu 🍿`
+    }]);
+
     setTargetSeatCode(null);
   };
 
@@ -223,6 +232,7 @@ export default function App() {
           if (currentUser) setIsLoginModalOpen(false);
         }}
         onLogin={handleLogin}
+        tempDiscordUser={tempDiscordUser}
         currentUser={currentUser}
       />
     </div>
