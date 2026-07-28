@@ -10,23 +10,18 @@ export const isAdminUser = (user) => {
   return ADMIN_DISCORD_IDS.includes(user.id.toString());
 };
 
-// User's Official Discord Application Credentials
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  let redirectUri = window.location.origin + window.location.pathname;
-  if (!redirectUri.endsWith('/')) {
-    redirectUri += '/';
-  }
-  // Standard Discord Authorization Code Grant (response_type=code)
+  // Clean origin URL without trailing slash: https://afksinema.pages.dev
+  const redirectUri = window.location.origin;
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
 };
 
 // Exchange OAuth Code for Token via Cloudflare Edge API (/api/discord-token)
 export const exchangeCodeForUser = async (code) => {
   try {
-    let redirectUri = window.location.origin + window.location.pathname;
-    if (!redirectUri.endsWith('/')) redirectUri += '/';
+    const redirectUri = window.location.origin;
 
     const tokenRes = await fetch('/api/discord-token', {
       method: 'POST',
