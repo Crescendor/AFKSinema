@@ -1,6 +1,7 @@
 import React from 'react';
-import { UserCheck, Crown, Armchair, Sparkles } from 'lucide-react';
+import { Crown, Armchair, Shield } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
+import { isAdminUser } from '../utils/discordAuth';
 
 const ROWS = [
   { id: 'A', name: 'Sıra A (VIP Lounge)', isVip: true, seatCount: 8 },
@@ -15,14 +16,23 @@ export function CinemaAuditorium({
   currentUser,
   onSelectSeat,
   onOpenLoginModal,
-  focusMode
+  onOpenAdminModal
 }) {
+  const isAdmin = isAdminUser(currentUser);
+
   const handleSeatClick = (rowId, seatNum, isVip) => {
-    sounds.playSeatSit();
     const seatCode = `${rowId}${seatNum}`;
+    const occupant = seatedUsers[seatCode];
+
+    // If Admin clicks on an occupied seat (of someone else), open Admin controls for that user!
+    if (isAdmin && occupant && occupant.id !== currentUser.id) {
+      onOpenAdminModal(occupant, seatCode);
+      return;
+    }
+
+    sounds.playSeatSit();
 
     if (!currentUser) {
-      // Prompt user to log in / set avatar first
       onOpenLoginModal(seatCode);
       return;
     }
@@ -103,6 +113,11 @@ export function CinemaAuditorium({
                         <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
                           Koltuk {seatCode} {isVip ? '• VIP Lounge' : ''}
                         </div>
+                        {isAdmin && !isMySeat && (
+                          <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', marginTop: '2px', fontWeight: 700 }}>
+                            👑 Tıkla: Koltuk Değiştir / At
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div>

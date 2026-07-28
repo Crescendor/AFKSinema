@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, Search, X, Link as LinkIcon, Trash2, Sparkles } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, Search, X, Link as LinkIcon, Trash2, Shield, Settings } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
-// Curated Fallback Giphy GIF List
 const INITIAL_GIFS = [
   { id: 'gif1', title: 'Popcorn Eat', url: 'https://media.giphy.com/media/hD9hL1xKvfB84/giphy.gif' },
   { id: 'gif2', title: 'Cinema Hype', url: 'https://media.giphy.com/media/t3qzK0rU7RjJS/giphy.gif' },
@@ -12,9 +11,7 @@ const INITIAL_GIFS = [
   { id: 'gif5', title: 'Cat Popcorn', url: 'https://media.giphy.com/media/13CoXDiaCcCoyk/giphy.gif' },
   { id: 'gif6', title: 'Laughing Hysterical', url: 'https://media.giphy.com/media/wW95fQuLluBqw/giphy.gif' },
   { id: 'gif7', title: 'Gaming Win', url: 'https://media.giphy.com/media/d9N8B1f67fPFe/giphy.gif' },
-  { id: 'gif8', title: 'Cyberpunk Vibe', url: 'https://media.giphy.com/media/fVzdQ7uYhTXajvTF7U/giphy.gif' },
-  { id: 'gif9', title: 'Anime Dance', url: 'https://media.giphy.com/media/11sBLVxNs7v6WA/giphy.gif' },
-  { id: 'gif10', title: 'Marvel Hero', url: 'https://media.giphy.com/media/3oKIPa2TdahY8LAAxy/giphy.gif' }
+  { id: 'gif8', title: 'Cyberpunk Vibe', url: 'https://media.giphy.com/media/fVzdQ7uYhTXajvTF7U/giphy.gif' }
 ];
 
 const EMOJI_CATEGORIES = [
@@ -29,7 +26,8 @@ export function DiscordSidebar({
   onDeleteMessage,
   seatedUsers,
   currentUser,
-  onTriggerReaction
+  onTriggerReaction,
+  onOpenAdminModal
 }) {
   const [activeTab, setActiveTab] = useState('chat');
   const [text, setText] = useState('');
@@ -49,7 +47,6 @@ export function DiscordSidebar({
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Live Giphy Search Handler
   useEffect(() => {
     if (!gifSearchQuery.trim()) {
       setGifResults(INITIAL_GIFS);
@@ -59,7 +56,6 @@ export function DiscordSidebar({
     const timer = setTimeout(async () => {
       setIsSearchingGifs(true);
       try {
-        // Giphy Public Beta API Key search
         const res = await fetch(`https://api.giphy.com/v1/gifs/search?api_key=pL0W9BUtB7bM6ngRWBCLKRkUhFjvuaAr&limit=10&q=${encodeURIComponent(gifSearchQuery.trim())}`);
         const data = await res.json();
 
@@ -71,7 +67,6 @@ export function DiscordSidebar({
           }));
           setGifResults(fetchedGifs);
         } else {
-          // Local filter fallback
           setGifResults(INITIAL_GIFS.filter(g => g.title.toLowerCase().includes(gifSearchQuery.toLowerCase())));
         }
       } catch (err) {
@@ -167,7 +162,7 @@ export function DiscordSidebar({
 
   const audienceList = Object.entries(seatedUsers).map(([seatCode, user]) => ({
     seatCode,
-    ...user
+    user
   }));
 
   const isAdmin = isAdminUser(currentUser);
@@ -215,7 +210,7 @@ export function DiscordSidebar({
               const canDelete = currentUser && (msg.user?.id === currentUser.id || isAdmin);
 
               return (
-                <div key={msg.id} className="chat-msg" style={{ position: 'relative', group: 'true' }}>
+                <div key={msg.id} className="chat-msg" style={{ position: 'relative' }}>
                   <img src={msg.user?.avatar} alt={msg.user?.username} className="chat-msg-avatar" />
                   <div className="chat-msg-content" style={{ flex: 1 }}>
                     <div className="chat-msg-user" style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -225,7 +220,6 @@ export function DiscordSidebar({
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{msg.time}</span>
                       </div>
 
-                      {/* Delete Message Button for Message Owner or Admin */}
                       {canDelete && (
                         <button
                           onClick={() => onDeleteMessage(msg.id)}
@@ -235,8 +229,7 @@ export function DiscordSidebar({
                             color: '#ef4444',
                             cursor: 'pointer',
                             padding: '2px 4px',
-                            opacity: 0.8,
-                            transition: 'opacity 0.2s ease'
+                            opacity: 0.8
                           }}
                           title="Mesajı Sil"
                         >
@@ -253,7 +246,7 @@ export function DiscordSidebar({
             <div ref={chatEndRef} />
           </div>
 
-          {/* Live Giphy GIF Search Drawer */}
+          {/* Giphy GIF Drawer */}
           {showGifPicker && (
             <div style={{
               background: '#161b2e',
@@ -267,12 +260,11 @@ export function DiscordSidebar({
                 <button onClick={() => setShowGifPicker(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}><X size={14} /></button>
               </div>
 
-              {/* Giphy Live Search Input */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.4)', padding: '6px 10px', borderRadius: '8px', marginBottom: '10px', border: '1px solid rgba(255,255,255,0.1)' }}>
                 <Search size={14} color="var(--text-muted)" />
                 <input
                   type="text"
-                  placeholder="GIF Ara... (Örn: popcorn, movie, anime, funny)"
+                  placeholder="GIF Ara..."
                   value={gifSearchQuery}
                   onChange={(e) => setGifSearchQuery(e.target.value)}
                   style={{ flex: 1, background: 'none', border: 'none', color: 'white', fontSize: '0.75rem', outline: 'none' }}
@@ -358,7 +350,7 @@ export function DiscordSidebar({
             </div>
           )}
 
-          {/* Chat Action Toolbar & Input */}
+          {/* Chat Toolbar & Input */}
           <div style={{ background: 'rgba(0,0,0,0.3)', borderTop: '1px solid var(--bg-card-border)', padding: '8px 12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <button
               onClick={() => { setShowGifPicker(!showGifPicker); setShowEmojiPicker(false); setShowImageModal(false); }}
@@ -408,11 +400,11 @@ export function DiscordSidebar({
 
           {audienceList.length === 0 ? (
             <div style={{ fontSize: '0.8rem', color: 'var(--text-dim)', textAlign: 'center', marginTop: '20px' }}>
-              Henüz koltuklara kimse oturmadı. Koltuğa tıklayıp yerinizi alın!
+              Henüz koltuklara kimse oturmadı.
             </div>
           ) : (
-            audienceList.map(({ seatCode, username, avatar, role, badge, id }) => {
-              const isMe = currentUser && currentUser.id === id;
+            audienceList.map(({ seatCode, user }) => {
+              const isMe = currentUser && currentUser.id === user.id;
               return (
                 <div
                   key={seatCode}
@@ -427,25 +419,47 @@ export function DiscordSidebar({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img src={avatar} alt={username} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
+                    <img src={user.avatar} alt={user.username} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {username} {isMe && <span style={{ fontSize: '0.65rem', color: '#34d399' }}>(Siz)</span>}
+                        {user.username} {isMe && <span style={{ fontSize: '0.65rem', color: '#34d399' }}>(Siz)</span>}
                       </div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{role || 'İzleyici'}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role || 'İzleyici'}</div>
                     </div>
                   </div>
 
-                  <span style={{
-                    background: 'var(--discord-blurple)',
-                    color: 'white',
-                    padding: '2px 8px',
-                    borderRadius: '6px',
-                    fontSize: '0.75rem',
-                    fontWeight: 700
-                  }}>
-                    {seatCode}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span style={{
+                      background: 'var(--discord-blurple)',
+                      color: 'white',
+                      padding: '2px 8px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 700
+                    }}>
+                      {seatCode}
+                    </span>
+
+                    {/* Admin Action Button */}
+                    {isAdmin && !isMe && (
+                      <button
+                        onClick={() => onOpenAdminModal(user, seatCode)}
+                        style={{
+                          background: 'rgba(255, 183, 3, 0.2)',
+                          border: '1px solid var(--accent-gold)',
+                          color: 'var(--accent-gold)',
+                          borderRadius: '6px',
+                          padding: '4px 6px',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center'
+                        }}
+                        title="Kullanıcı Yönetimi (Taşı / At)"
+                      >
+                        <Settings size={14} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })

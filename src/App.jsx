@@ -3,9 +3,18 @@ import { CinemaScreen } from './components/CinemaScreen';
 import { CinemaAuditorium } from './components/CinemaAuditorium';
 import { DiscordSidebar } from './components/DiscordSidebar';
 import { DiscordLoginModal } from './components/DiscordLoginModal';
+import { AdminControlsModal } from './components/AdminControlsModal';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn } from 'lucide-react';
+import { LogIn, ShieldAlert, Ban } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
+
+const ALL_SEAT_CODES = [
+  'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8',
+  'B1', 'B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B9', 'B10',
+  'C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7', 'C8', 'C9', 'C10',
+  'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7', 'D8', 'D9', 'D10',
+  'E1', 'E2', 'E3', 'E4', 'E5', 'E6', 'E7', 'E8', 'E9', 'E10'
+];
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState(null);
@@ -18,6 +27,19 @@ export default function App() {
   const [isLoginModalOpen, setIsLoginModalOpen] = useState(true);
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
+
+  // Admin Control Modal State
+  const [adminModalUser, setAdminModalUser] = useState(null);
+  const [adminModalSeat, setAdminModalSeat] = useState(null);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Seat Change Anti-Spam Tracker: { [userId]: { count: 0, resetTime: timestamp } }
+  const [seatChangeLimits, setSeatChangeLimits] = useState({});
+
+  // Banned / Kicked Users: { [userId]: { isPerm: boolean, until: timestamp } }
+  const [bannedUsers, setBannedUsers] = useState({});
+
+  const isAdmin = isAdminUser(currentUser);
 
   // Check URL Search Params for ?code= OR Hash for #access_token=
   useEffect(() => {
@@ -48,11 +70,41 @@ export default function App() {
     }
   }, []);
 
+  // Seat Selection with Anti-Spam Cooldown Enforcement (10 changes / 10 mins)
   const handleSelectSeat = (seatCode) => {
     if (!currentUser) {
       setTargetSeatCode(seatCode);
       setIsLoginModalOpen(true);
       return;
+    }
+
+    // Check if user is currently banned
+    const userBan = bannedUsers[currentUser.id];
+    if (userBan) {
+      if (userBan.isPerm || Date.now() < userBan.until) {
+        alert('⛔ SİNEMADAN UZAKLAŞTIRILDINIZ:\nBu sinema salonundan geçici veya kalıcı olarak uzaklaştırıldınız.');
+        return;
+      }
+    }
+
+    // Non-Admin Seat Change Cooldown Enforcement
+    if (!isAdmin) {
+      const userId = currentUser.id;
+      const now = Date.now();
+      const userLimit = seatChangeLimits[userId] || { count: 0, resetTime: now + (10 * 60 * 1000) };
+
+      if (now > userLimit.resetTime) {
+        // Cooldown window expired, reset count
+        seatChangeLimits[userId] = { count: 1, resetTime: now + (10 * 60 * 1000) };
+      } else {
+        if (userLimit.count >= 10) {
+          const remainingMinutes = Math.ceil((userLimit.resetTime - now) / (60 * 1000));
+          alert(`⏱️ KOLTUK DEĞİŞTİRME LİMİTİ:\nÇok fazla koltuk değiştirdiniz! 10 dakikada en fazla 10 kez koltuk değiştirebilirsiniz.\nYenilenmesine kalan süre: ${remainingMinutes} dakika.`);
+          return;
+        }
+        seatChangeLimits[userId] = { count: userLimit.count + 1, resetTime: userLimit.resetTime };
+      }
+      setSeatChangeLimits({ ...seatChangeLimits });
     }
 
     let oldSeatCode = null;
@@ -75,6 +127,13 @@ export default function App() {
   };
 
   const handleLogin = (finalUser) => {
+    // Check if user is banned
+    const userBan = bannedUsers[finalUser.id];
+    if (userBan && (userBan.isPerm || Date.now() < userBan.until)) {
+      alert('⛔ UZAKLAŞTIRILDINIZ: Bu kullanıcı sinema salonundan uzaklaştırılmıştır.');
+      return;
+    }
+
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
 
@@ -99,7 +158,53 @@ export default function App() {
     setTargetSeatCode(null);
   };
 
-  // Rich message handler (text, image, gif)
+  // Admin Handler: Move any user to a new seat
+  const handleAdminMoveUser = (userId, oldSeat, newSeat) => {
+    const updated = { ...seatedUsers };
+    const targetUserObj = updated[oldSeat];
+    if (targetUserObj) {
+      delete updated[oldSeat];
+      updated[newSeat] = targetUserObj;
+      setSeatedUsers(updated);
+
+      setMessages(prev => [...prev, {
+        id: 'sys_' + Date.now(),
+        type: 'system',
+        text: `👑 Admin ${targetUserObj.username} kullanıcısını ${oldSeat} koltuğundan ${newSeat} koltuğuna taşıdı.`
+      }]);
+    }
+  };
+
+  // Admin Handler: Kick or Permanent Ban user
+  const handleAdminKickUser = (targetUser, durationMinutes, isPerm) => {
+    const userId = targetUser.id;
+    const until = isPerm ? 0 : Date.now() + (durationMinutes * 60 * 1000);
+
+    setBannedUsers(prev => ({
+      ...prev,
+      [userId]: { isPerm, until }
+    }));
+
+    // Clear user seat if currently sitting
+    const updated = { ...seatedUsers };
+    Object.entries(updated).forEach(([code, u]) => {
+      if (u.id === userId) delete updated[code];
+    });
+    setSeatedUsers(updated);
+
+    // If target user is the logged in user, log out
+    if (currentUser && currentUser.id === userId) {
+      setCurrentUser(null);
+      setIsLoginModalOpen(true);
+    }
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `⛔ Admin ${targetUser.username} kullanıcısını ${isPerm ? 'sınırsız banladı' : `${durationMinutes} dakikalığına salondan attı`}.`
+    }]);
+  };
+
   const handleSendMessage = (msgData) => {
     if (!currentUser) {
       setIsLoginModalOpen(true);
@@ -123,7 +228,6 @@ export default function App() {
     setMessages(prev => [...prev, msg]);
   };
 
-  // Delete message handler
   const handleDeleteMessage = (msgId) => {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
@@ -155,6 +259,14 @@ export default function App() {
     }, 2200);
   };
 
+  const openAdminModal = (user, seatCode) => {
+    setAdminModalUser(user);
+    setAdminModalSeat(seatCode);
+    setIsAdminModalOpen(true);
+  };
+
+  const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
+
   return (
     <div className={`app-container ${lightsDimmed ? 'lights-dimmed' : ''}`}>
       {/* Header */}
@@ -184,7 +296,7 @@ export default function App() {
             >
               <img src={currentUser.avatar} alt={currentUser.username} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{currentUser.username}</span>
-              {isAdminUser(currentUser) && (
+              {isAdmin && (
                 <span style={{ fontSize: '0.7rem', background: 'var(--accent-gold)', color: 'black', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
                   👑 ADMIN
                 </span>
@@ -215,6 +327,7 @@ export default function App() {
             currentUser={currentUser}
             onSelectSeat={handleSelectSeat}
             onOpenLoginModal={(seat) => { setTargetSeatCode(seat); setIsLoginModalOpen(true); }}
+            onOpenAdminModal={openAdminModal}
           />
 
           <InteractionsOverlay
@@ -224,7 +337,7 @@ export default function App() {
           />
         </main>
 
-        {/* Discord Sidebar (Right - Rich Chat & Audience List) */}
+        {/* Discord Sidebar */}
         <DiscordSidebar
           messages={messages}
           onSendMessage={handleSendMessage}
@@ -232,6 +345,7 @@ export default function App() {
           seatedUsers={seatedUsers}
           currentUser={currentUser}
           onTriggerReaction={handleTriggerReaction}
+          onOpenAdminModal={openAdminModal}
         />
       </div>
 
@@ -243,6 +357,17 @@ export default function App() {
         onLogin={handleLogin}
         tempDiscordUser={tempDiscordUser}
         currentUser={currentUser}
+      />
+
+      {/* Admin Action Modal for User Management & Relocation */}
+      <AdminControlsModal
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        targetUser={adminModalUser}
+        currentSeatCode={adminModalSeat}
+        availableSeats={availableSeats}
+        onMoveUser={handleAdminMoveUser}
+        onKickUser={handleAdminKickUser}
       />
     </div>
   );
