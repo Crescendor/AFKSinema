@@ -14,7 +14,11 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  const redirectUri = window.location.origin + window.location.pathname;
+  // Ensure redirectUri strictly ends with a trailing slash to match Discord Portal exact string
+  let redirectUri = window.location.origin;
+  if (!redirectUri.endsWith('/')) {
+    redirectUri += '/';
+  }
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify`;
 };
 
