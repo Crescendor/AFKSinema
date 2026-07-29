@@ -180,7 +180,7 @@ export function CinemaScreen({
         <div className="screen-frame" style={{ flex: 1, height: '100%', position: 'relative' }}>
           <div className="screen-curtain-top" />
 
-          {/* Fullscreen Chat Toggle Button Floating inside Video */}
+          {/* Clean Single Toggle 'Sohbet' Button */}
           {isFullscreen && (
             <button
               onClick={() => setIsFsChatOpen(!isFsChatOpen)}
@@ -190,7 +190,7 @@ export function CinemaScreen({
                 right: '16px',
                 zIndex: 999999,
                 background: isFsChatOpen ? 'var(--cinema-red)' : 'rgba(15, 6, 10, 0.88)',
-                border: '1px solid var(--cinema-red)',
+                border: `1px solid ${isFsChatOpen ? 'var(--cinema-red)' : 'rgba(255,255,255,0.2)'}`,
                 color: 'white',
                 borderRadius: '20px',
                 padding: '8px 16px',
@@ -200,11 +200,13 @@ export function CinemaScreen({
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.8)'
+                boxShadow: '0 4px 16px rgba(0,0,0,0.8)',
+                transition: 'all 0.2s ease'
               }}
+              title="Sohbeti Aç / Kapat"
             >
               <MessageSquare size={16} color="white" />
-              {isFsChatOpen ? '💬 Sohbeti Gizle' : '💬 Sohbeti Aç'}
+              Sohbet
             </button>
           )}
 
