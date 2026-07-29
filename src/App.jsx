@@ -708,7 +708,6 @@ export default function App() {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
-  // Real-Time Floating Reactions (Broadcast to all users without audio for remote viewers)
   const handleTriggerReaction = (emoji) => {
     let seatX = 50;
     let mySeatCode = null;
@@ -731,10 +730,8 @@ export default function App() {
       timestamp: Date.now()
     };
 
-    // Render locally
     setActiveReactions(prev => [...prev, newReaction]);
 
-    // Broadcast to Cloudflare Edge room for other users
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -849,6 +846,7 @@ export default function App() {
             currentUser={currentUser}
             messages={messages}
             activeMola={activeMola}
+            onSendMessage={handleSendMessage}
           />
 
           <CinemaAuditorium

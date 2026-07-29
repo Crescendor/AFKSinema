@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Monitor, Maximize, Shield, Sparkles, Coffee, MessageSquareOff, MessageSquare } from 'lucide-react';
+import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Smile } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
@@ -10,16 +10,17 @@ export function CinemaScreen({
   setBroadcasterName,
   currentUser,
   messages = [],
-  activeMola = null
+  activeMola = null,
+  onSendMessage
 }) {
   const [isBroadcasting, setIsBroadcasting] = useState(false);
   const [stream, setStream] = useState(null);
   const [colorGlow, setColorGlow] = useState('rgba(225, 29, 72, 0.4)');
   const [isFullscreen, setIsFullscreen] = useState(false);
   
-  // Fullscreen Floating Top-Right Chat Toast
-  const [showFullscreenChat, setShowFullscreenChat] = useState(true);
-  const [activeToastMsg, setActiveToastMsg] = useState(null);
+  // Fullscreen Floating Chat Panel State
+  const [isFsChatOpen, setIsFsChatOpen] = useState(true);
+  const [fsText, setFsText] = useState('');
 
   // Mola Elapsed Forward Counter
   const [molaSeconds, setMolaSeconds] = useState(0);
@@ -27,6 +28,7 @@ export function CinemaScreen({
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const screenFrameRef = useRef(null);
+  const chatScrollRef = useRef(null);
 
   const isAdmin = isAdminUser(currentUser);
 
@@ -45,21 +47,12 @@ export function CinemaScreen({
     return () => clearInterval(interval);
   }, [activeMola]);
 
-  // Handle Fullscreen Floating Chat 3-Second Toast Trigger
+  // Auto-scroll chat feed in fullscreen
   useEffect(() => {
-    if (!isFullscreen || !showFullscreenChat || messages.length === 0) return;
-
-    const latestMsg = messages[messages.length - 1];
-    if (latestMsg && latestMsg.type !== 'system') {
-      setActiveToastMsg(latestMsg);
-
-      const hideTimer = setTimeout(() => {
-        setActiveToastMsg(null);
-      }, 3000);
-
-      return () => clearTimeout(hideTimer);
+    if (chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
     }
-  }, [messages, isFullscreen, showFullscreenChat]);
+  }, [messages, isFsChatOpen]);
 
   // WebRTC Screen Share
   const handleStartBroadcast = async () => {
@@ -118,6 +111,17 @@ export function CinemaScreen({
     return () => document.removeEventListener('fullscreenchange', handleFSChange);
   }, []);
 
+  const handleFsSendSubmit = (e) => {
+    e.preventDefault();
+    if (!fsText.trim()) return;
+
+    if (onSendMessage) {
+      onSendMessage({ text: fsText.trim() });
+      sounds.playPopcornCrunch();
+    }
+    setFsText('');
+  };
+
   // Format Elapsed Mola Seconds to MM:SS
   const formatMolaTime = (sec) => {
     const m = Math.floor(sec / 60).toString().padStart(2, '0');
@@ -126,7 +130,7 @@ export function CinemaScreen({
   };
 
   return (
-    <div className="ambilight-wrapper" ref={screenFrameRef}>
+    <div className="ambilight-wrapper" ref={screenFrameRef} style={{ position: 'relative' }}>
       {/* Dynamic Ambilight Background Glow */}
       <div
         className="ambilight-glow"
@@ -136,37 +140,82 @@ export function CinemaScreen({
       <canvas ref={canvasRef} style={{ display: 'none' }} width={32} height={18} />
 
       {/* Screen Frame */}
-      <div className="screen-frame">
+      <div className="screen-frame" style={{ position: 'relative' }}>
         <div className="screen-curtain-top" />
 
-        {/* Fullscreen Top-Right Floating Chat (3-Second Duration) */}
-        {isFullscreen && showFullscreenChat && activeToastMsg && (
+        {/* FULLSCREEN FLOATING CHAT DRAWER */}
+        {isFullscreen && isFsChatOpen && (
           <div style={{
             position: 'absolute',
-            top: '20px',
-            right: '20px',
-            zIndex: 100,
-            background: 'rgba(15, 6, 10, 0.88)',
-            backdropFilter: 'blur(12px)',
+            top: '16px',
+            right: '16px',
+            bottom: '16px',
+            width: '320px',
+            background: 'rgba(12, 5, 8, 0.92)',
+            backdropFilter: 'blur(20px)',
             border: '1px solid var(--bg-card-border)',
-            borderRadius: '12px',
-            padding: '10px 14px',
+            borderRadius: '16px',
             display: 'flex',
-            alignItems: 'center',
-            gap: '10px',
-            maxWidth: '320px',
-            boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
-            animation: 'fadeIn 0.3s ease'
+            flexDirection: 'column',
+            zIndex: 999,
+            boxShadow: '0 10px 40px rgba(0,0,0,0.95)',
+            overflow: 'hidden'
           }}>
-            <img src={activeToastMsg.user?.avatar} alt={activeToastMsg.user?.username} style={{ width: '32px', height: '32px', borderRadius: '50%' }} />
-            <div>
-              <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--cinema-red)' }}>
-                {activeToastMsg.user?.username}
+            {/* Fullscreen Chat Header */}
+            <div style={{
+              padding: '12px 14px',
+              borderBottom: '1px solid rgba(255,255,255,0.08)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(0,0,0,0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', fontWeight: 800, color: 'white' }}>
+                <MessageSquare size={16} color="var(--cinema-red)" />
+                Sinema Sohbeti
               </div>
-              <div style={{ fontSize: '0.8rem', color: 'white', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {activeToastMsg.text || '📷 Görsel/Medya'}
-              </div>
+              <button
+                onClick={() => setIsFsChatOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}
+              >
+                <X size={16} />
+              </button>
             </div>
+
+            {/* Messages Feed */}
+            <div ref={chatScrollRef} style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {messages.map((m) => (
+                <div key={m.id} style={{ display: 'flex', gap: '8px', background: m.type === 'system' ? 'rgba(225,29,72,0.1)' : 'rgba(255,255,255,0.03)', padding: '6px 8px', borderRadius: '8px' }}>
+                  {m.user?.avatar && (
+                    <img src={m.user.avatar} alt={m.user.username} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
+                  )}
+                  <div style={{ flex: 1, overflow: 'hidden' }}>
+                    {m.user && (
+                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--cinema-red)' }}>
+                        {m.user.username} {m.seatCode ? `[${m.seatCode}]` : ''}
+                      </div>
+                    )}
+                    <div style={{ fontSize: '0.78rem', color: m.type === 'system' ? 'var(--accent-gold)' : 'white', wordBreak: 'break-word' }}>
+                      {m.text}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Input Form inside Fullscreen Mode */}
+            <form onSubmit={handleFsSendSubmit} style={{ padding: '10px', borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.4)', display: 'flex', gap: '6px' }}>
+              <input
+                type="text"
+                placeholder="Tam ekranda yazın..."
+                value={fsText}
+                onChange={(e) => setFsText(e.target.value)}
+                style={{ flex: 1, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '8px', padding: '6px 10px', color: 'white', fontSize: '0.78rem' }}
+              />
+              <button type="submit" className="btn-cinema primary" style={{ padding: '6px 10px' }}>
+                <Send size={14} />
+              </button>
+            </form>
           </div>
         )}
 
@@ -276,15 +325,15 @@ export function CinemaScreen({
 
         {/* Right: Controls & Fullscreen Toggle */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-          {/* Fullscreen Chat Toggle */}
+          {/* Fullscreen Floating Chat Drawer Toggle */}
           {isFullscreen && (
             <button
               className="btn-cinema"
-              onClick={() => setShowFullscreenChat(!showFullscreenChat)}
-              style={{ padding: '6px 12px', fontSize: '0.75rem' }}
+              onClick={() => setIsFsChatOpen(!isFsChatOpen)}
+              style={{ padding: '6px 12px', fontSize: '0.75rem', background: isFsChatOpen ? 'var(--cinema-red)' : 'rgba(0,0,0,0.4)', color: 'white' }}
             >
-              {showFullscreenChat ? <MessageSquare size={14} /> : <MessageSquareOff size={14} />}
-              {showFullscreenChat ? 'Sohbet Açık' : 'Sohbet Kapalı'}
+              <MessageSquare size={14} />
+              {isFsChatOpen ? 'Sohbeti Gizle' : '💬 Sohbeti Aç'}
             </button>
           )}
 
