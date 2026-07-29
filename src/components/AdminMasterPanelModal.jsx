@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Plus, Trash2, ArrowRightLeft, Coins, Star, Ban, X, Play, Square, Calendar, Lightbulb, Smile } from 'lucide-react';
+import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Trash2, Ban, X, Play, Square, Calendar, Lightbulb, Smile, CheckCircle, Clock, History } from 'lucide-react';
 
 const BUFFET_EMOJI_PALETTE = [
   '🍿', '🥤', '🍦', '🍫', '🍺', '👑', '🍕', '🍔', 
@@ -13,6 +13,7 @@ export function AdminMasterPanelModal({
   onClose,
   moviePosters,
   onAddMoviePoster,
+  onUpdateMoviePosters,
   onDeleteMoviePoster,
   activeMola,
   onStartMola,
@@ -40,7 +41,6 @@ export function AdminMasterPanelModal({
   const [movieTitle, setMovieTitle] = useState('');
   const [movieImageUrl, setMovieImageUrl] = useState('');
   const [movieReleaseDate, setMovieReleaseDate] = useState('29 Temmuz 2026');
-  const [movieStatus, setMovieStatus] = useState('Oynatılıyor');
 
   // Mola State
   const [molaPreset, setMolaPreset] = useState('🚽 Çiş Molası');
@@ -79,11 +79,29 @@ export function AdminMasterPanelModal({
       title: movieTitle.trim(),
       imageUrl: movieImageUrl.trim(),
       releaseDate: movieReleaseDate.trim() || 'Çok Yakında',
-      status: movieStatus
+      status: 'Yakında'
     });
 
     setMovieTitle('');
     setMovieImageUrl('');
+  };
+
+  const handleStartSeance = (posterId) => {
+    const updated = moviePosters.map(p => {
+      if (p.id === posterId) return { ...p, status: 'Oynatılıyor' };
+      // Stop other playing seances
+      if (p.status === 'Oynatılıyor') return { ...p, status: 'Geçmiş Seans' };
+      return p;
+    });
+    if (onUpdateMoviePosters) onUpdateMoviePosters(updated);
+  };
+
+  const handleEndSeance = (posterId) => {
+    const updated = moviePosters.map(p => {
+      if (p.id === posterId) return { ...p, status: 'Geçmiş Seans' };
+      return p;
+    });
+    if (onUpdateMoviePosters) onUpdateMoviePosters(updated);
   };
 
   const handleStartMolaSubmit = (e) => {
@@ -234,12 +252,12 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 1: MOVIE POSTERS & RELEASE DATES */}
+        {/* TAB 1: MOVIE POSTERS & SEANCE MANAGEMENT */}
         {activeTab === 'movies' && (
           <div>
             <form onSubmit={handleAddPosterSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--bg-card-border)' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '10px' }}>
-                + Yeni Film Afişi & Gösterim Tarihi Ekle
+                + Yeni Film Afişi Ekle
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
@@ -275,28 +293,9 @@ export function AdminMasterPanelModal({
                 </label>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <button
-                    type="button"
-                    onClick={() => setMovieStatus('Oynatılıyor')}
-                    style={{ background: movieStatus === 'Oynatılıyor' ? 'var(--cinema-red)' : 'rgba(0,0,0,0.4)', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    🎥 Oynatılıyor
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setMovieStatus('Yakında')}
-                    style={{ background: movieStatus === 'Yakında' ? 'var(--accent-gold)' : 'rgba(0,0,0,0.4)', color: movieStatus === 'Yakında' ? 'black' : 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 700, cursor: 'pointer' }}
-                  >
-                    🍿 Yakında
-                  </button>
-                </div>
-
-                <button type="submit" className="btn-cinema primary" style={{ padding: '6px 16px', fontSize: '0.8rem' }}>
-                  Afişi Yayınla
-                </button>
-              </div>
+              <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '8px', fontSize: '0.82rem', justifyContent: 'center' }}>
+                Afişi Yayınla
+              </button>
             </form>
 
             <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -307,11 +306,29 @@ export function AdminMasterPanelModal({
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status}
+                        <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status || 'Yakında'}
                       </div>
                     </div>
                   </div>
-                  <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    {p.status === 'Oynatılıyor' ? (
+                      <button
+                        onClick={() => handleEndSeance(p.id)}
+                        style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Square size={12} /> Seansı Bitir
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleStartSeance(p.id)}
+                        style={{ background: 'var(--cinema-red)', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                      >
+                        <Play size={12} /> Seansı Başlat
+                      </button>
+                    )}
+                    <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                  </div>
                 </div>
               ))}
             </div>

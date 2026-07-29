@@ -255,32 +255,39 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // 10-Minute Loyalty Credit Interval (+20 for Standard, +50 for VIP)
+  // 10-Minute Seance Credit Loop: ONLY awarded if a movie seance is ACTIVE AND user is SEATED in the cinema!
   useEffect(() => {
     const creditTimer = setInterval(() => {
       if (currentUser && !isAdmin) {
-        const isUserVip = vipUsers[currentUser.id];
-        const grantReward = isUserVip ? 50 : 20;
+        // Check if a seance is currently active
+        const isSeanceActive = moviePosters.some(p => p.status === 'Oynatılıyor');
+        // Check if user is currently seated in a cinema seat
+        const isUserSeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
 
-        setUserCredits(prev => {
-          const currentBal = prev[currentUser.id] || 50;
-          const updatedBal = currentBal + grantReward;
-          
-          setMessages(prevMsgs => [...prevMsgs, {
-            id: 'sys_' + Date.now(),
-            type: 'system',
-            text: isUserVip
-              ? `⭐ VIP SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +50 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
-              : `🪙 SADAKAT ÖDÜLÜ: Salonda 10 dakika durduğunuz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
-          }]);
+        if (isSeanceActive && isUserSeated) {
+          const isUserVip = vipUsers[currentUser.id];
+          const grantReward = isUserVip ? 50 : 20;
 
-          return { ...prev, [currentUser.id]: updatedBal };
-        });
+          setUserCredits(prev => {
+            const currentBal = prev[currentUser.id] || 50;
+            const updatedBal = currentBal + grantReward;
+            
+            setMessages(prevMsgs => [...prevMsgs, {
+              id: 'sys_' + Date.now(),
+              type: 'system',
+              text: isUserVip
+                ? `⭐ VIP SEANS ÖDÜLÜ: Canlı seansı 10 dakika izlediğiniz için +50 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+                : `🪙 SEANS ÖDÜLÜ: Canlı seansı 10 dakika izlediğiniz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+            }]);
+
+            return { ...prev, [currentUser.id]: updatedBal };
+          });
+        }
       }
     }, 10 * 60 * 1000);
 
     return () => clearInterval(creditTimer);
-  }, [currentUser, isAdmin, vipUsers]);
+  }, [currentUser, isAdmin, vipUsers, moviePosters, seatedUsers]);
 
   // 20-Minute Snack Auto-Expiry Cleanup Interval
   useEffect(() => {
@@ -549,6 +556,15 @@ export default function App() {
       }).catch(() => {});
       return updated;
     });
+  };
+
+  const handleUpdateMoviePosters = (updatedPosters) => {
+    setMoviePosters(updatedPosters);
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updatedPosters } })
+    }).catch(() => {});
   };
 
   const handleDeleteMoviePoster = (posterId) => {
@@ -826,9 +842,6 @@ export default function App() {
         {/* Left Side: Cinema Movie Posters Billboard Panel */}
         <MovieBillboardLeft
           moviePosters={moviePosters}
-          onAddMoviePoster={handleAddMoviePoster}
-          onDeleteMoviePoster={handleDeleteMoviePoster}
-          isAdmin={isAdmin}
         />
 
         {/* Workspace: Screen + Auditorium */}
@@ -954,6 +967,7 @@ export default function App() {
         onClose={() => setIsAdminMasterOpen(false)}
         moviePosters={moviePosters}
         onAddMoviePoster={handleAddMoviePoster}
+        onUpdateMoviePosters={handleUpdateMoviePosters}
         onDeleteMoviePoster={handleDeleteMoviePoster}
         activeMola={activeMola}
         onStartMola={handleStartMola}
