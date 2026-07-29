@@ -40,15 +40,6 @@ export function InteractionsOverlay({
 
   return (
     <div className="cinema-controls-deck" style={{ position: 'relative', zIndex: 45 }}>
-      {/* Buffet Button */}
-      <button
-        className="btn-cinema primary"
-        onClick={onOpenBuffet}
-        style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #d97706, #b45309)', borderColor: 'var(--accent-gold)' }}
-      >
-        <ShoppingBag size={16} /> Sinema Büfesi
-      </button>
-
       {/* Popcorn Eat button with 20-Bites Counter */}
       <button
         className="btn-cinema"

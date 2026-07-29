@@ -49,6 +49,35 @@ const INITIAL_MOVIE_POSTERS = [
 
 const SNACK_EXPIRY_MS = 20 * 60 * 1000;
 
+function findNearestFreeSeat(targetSeat, seatedMap, currentUserId) {
+  if (!seatedMap || !seatedMap[targetSeat] || (currentUserId && seatedMap[targetSeat].id === currentUserId)) {
+    return targetSeat;
+  }
+
+  const rowChar = targetSeat[0];
+  const num = parseInt(targetSeat.slice(1), 10);
+  const rowSeats = ALL_SEAT_CODES.filter(code => code[0] === rowChar);
+  const maxNumInRow = rowSeats.length;
+
+  for (let delta = 1; delta <= maxNumInRow; delta++) {
+    const rightCode = `${rowChar}${num + delta}`;
+    if (ALL_SEAT_CODES.includes(rightCode) && !seatedMap[rightCode]) {
+      return rightCode;
+    }
+    const leftCode = `${rowChar}${num - delta}`;
+    if (ALL_SEAT_CODES.includes(leftCode) && !seatedMap[leftCode]) {
+      return leftCode;
+    }
+  }
+
+  const freeSeats = ALL_SEAT_CODES.filter(code => !seatedMap[code]);
+  if (freeSeats.length > 0) {
+    return freeSeats[0];
+  }
+
+  return targetSeat;
+}
+
 function sanitizeSeatedUsers(seatedMap) {
   if (!seatedMap || typeof seatedMap !== 'object') return {};
   const cleaned = {};
@@ -56,12 +85,66 @@ function sanitizeSeatedUsers(seatedMap) {
 
   Object.entries(seatedMap).forEach(([seatCode, user]) => {
     if (user && user.id && !seenUserIds.has(user.id)) {
+      let finalSeat = seatCode;
+      if (cleaned[finalSeat]) {
+        finalSeat = findNearestFreeSeat(seatCode, cleaned, user.id);
+      }
       seenUserIds.add(user.id);
-      cleaned[seatCode] = user;
+      cleaned[finalSeat] = user;
     }
   });
 
   return cleaned;
+}
+
+function BufeStandSide({ onOpenBuffet }) {
+  return (
+    <div
+      onClick={onOpenBuffet}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '16px 10px',
+        cursor: 'pointer',
+        zIndex: 42,
+        userSelect: 'none',
+        transition: 'transform 0.2s ease',
+        background: 'rgba(12, 5, 9, 0.6)',
+        borderRight: '1px solid rgba(255,255,255,0.06)'
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.04)'}
+      onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+      title="🍿 AFK Sinema Büfesi - Tıkla Sipariş Ver"
+    >
+      <img
+        src="/the_bufeh.png"
+        alt="AFK Sinema The Büfeh"
+        style={{
+          width: '135px',
+          height: 'auto',
+          objectFit: 'contain',
+          filter: 'drop-shadow(0 0 15px rgba(225, 29, 72, 0.8)) drop-shadow(0 0 25px rgba(251, 191, 36, 0.5))'
+        }}
+      />
+      <div style={{
+        marginTop: '10px',
+        background: 'linear-gradient(135deg, var(--cinema-red), #b45309)',
+        color: 'white',
+        padding: '5px 12px',
+        borderRadius: '16px',
+        fontSize: '0.74rem',
+        fontWeight: 800,
+        boxShadow: '0 0 14px rgba(225,29,72,0.6)',
+        border: '1px solid rgba(255,255,255,0.2)',
+        textAlign: 'center',
+        whiteSpace: 'nowrap'
+      }}>
+        🍿 Büfe Siparişi Ver
+      </div>
+    </div>
+  );
 }
 
 export default function App() {
@@ -98,6 +181,14 @@ export default function App() {
   const [broadcasterPeerId, setBroadcasterPeerId] = useState('');
   const [streamUrl, setStreamUrl] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
+
+  // Custom User Badges State
+  const [userBadges, setUserBadges] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_user_badges');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
 
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
   const [isMolaModalOpen, setIsMolaModalOpen] = useState(false);
@@ -445,11 +536,31 @@ export default function App() {
       setSeatChangeLimits({ ...seatChangeLimits });
     }
 
+    const actualSeatCode = findNearestFreeSeat(seatCode, seatedUsers, currentUser.id);
+
+    if (!isAdmin) {
+      const userId = currentUser.id;
+      const now = Date.now();
+      const userLimit = seatChangeLimits[userId] || { count: 0, resetTime: now + (10 * 60 * 1000) };
+
+      if (now > userLimit.resetTime) {
+        seatChangeLimits[userId] = { count: 1, resetTime: now + (10 * 60 * 1000) };
+      } else {
+        if (userLimit.count >= 10) {
+          const remainingMinutes = Math.ceil((userLimit.resetTime - now) / (60 * 1000));
+          alert(`⏱️ KOLTUK DEĞİŞTİRME LİMİTİ:\nÇok fazla koltuk değiştirdiniz! 10 dakikada en fazla 10 kez koltuk değiştirebilirsiniz.\nYenilenmesine kalan süre: ${remainingMinutes} dakika.`);
+          return;
+        }
+        seatChangeLimits[userId] = { count: userLimit.count + 1, resetTime: userLimit.resetTime };
+      }
+      setSeatChangeLimits({ ...seatChangeLimits });
+    }
+
     const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
       if (u.id !== currentUser.id) updated[code] = u;
     });
-    updated[seatCode] = currentUser;
+    updated[actualSeatCode] = currentUser;
 
     const sanitized = sanitizeSeatedUsers(updated);
     setSeatedUsers(sanitized);
@@ -457,13 +568,16 @@ export default function App() {
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode, user: currentUser } })
+      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: actualSeatCode, user: currentUser } })
     }).catch(() => {});
 
+    const wasRelocated = actualSeatCode !== seatCode;
     const newMsg = {
       id: 'sys_' + Date.now(),
       type: 'system',
-      text: `${currentUser.username} ${seatCode} koltuğuna oturdu 🍿`
+      text: wasRelocated
+        ? `${currentUser.username} ${seatCode} koltuğu dolu olduğu için en yakın ${actualSeatCode} koltuğuna oturtuldu 🪑`
+        : `${currentUser.username} ${actualSeatCode} koltuğuna oturdu 🍿`
     };
     setMessages(prev => [...prev, newMsg]);
   };
@@ -485,23 +599,24 @@ export default function App() {
 
     // Eğer kullanıcı giriş yapmadan önce bir koltuğa tıkladıysa, o koltuğa oturt
     if (targetSeatCode) {
+      const actualSeat = findNearestFreeSeat(targetSeatCode, seatedUsers, finalUser.id);
       const updated = {};
       Object.entries(seatedUsers).forEach(([code, u]) => {
         if (u.id !== finalUser.id) updated[code] = u;
       });
-      updated[targetSeatCode] = finalUser;
+      updated[actualSeat] = finalUser;
       setSeatedUsers(sanitizeSeatedUsers(updated));
 
       fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: targetSeatCode, user: finalUser } })
+        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: actualSeat, user: finalUser } })
       }).catch(() => {});
 
       setMessages(prev => [...prev, {
         id: 'sys_' + Date.now(),
         type: 'system',
-        text: `${finalUser.username} salona katıldı ve ${targetSeatCode} koltuğuna oturdu 🍿`
+        text: `${finalUser.username} salona katıldı ve ${actualSeat} koltuğuna oturdu 🍿`
       }]);
 
       setTargetSeatCode(null);
@@ -807,6 +922,24 @@ export default function App() {
     }]);
   };
 
+  const handleUpdateUserBadge = (userId, badgeObj) => {
+    setUserBadges(prev => {
+      const updated = { ...prev };
+      if (!badgeObj || (!badgeObj.text && !badgeObj.emoji)) {
+        delete updated[userId];
+      } else {
+        updated[userId] = badgeObj;
+      }
+      localStorage.setItem('afk_user_badges', JSON.stringify(updated));
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_STATE', data: { userBadges: updated } })
+      }).catch(() => {});
+      return updated;
+    });
+  };
+
   const handleSendMessage = (msgData) => {
     if (!currentUser) {
       setIsLoginModalOpen(true);
@@ -987,11 +1120,14 @@ export default function App() {
       </header>
 
       {/* Main Body */}
-      <div className="cinema-app-body">
+      <div className="cinema-app-body" style={{ display: 'flex', position: 'relative' }}>
         {/* Left Side: Cinema Movie Posters Billboard Panel */}
         <MovieBillboardLeft
           moviePosters={moviePosters}
         />
+
+        {/* Büfe Stand Banner Image between Billboards and Auditorium Seats */}
+        <BufeStandSide onOpenBuffet={() => setIsBuffetModalOpen(true)} />
 
         {/* Workspace: Screen + Auditorium */}
         <main className="cinema-hall-workspace" style={{ flex: 1 }}>
@@ -1007,6 +1143,8 @@ export default function App() {
             setStreamUrl={setStreamUrl}
             currentUser={currentUser}
             messages={messages}
+            userBadges={userBadges}
+            vipUsers={vipUsers}
             activeMola={activeMola}
             onSendMessage={handleSendMessage}
             onDeleteMessage={handleDeleteMessage}
@@ -1044,6 +1182,8 @@ export default function App() {
           onDeleteMessage={handleDeleteMessage}
           seatedUsers={seatedUsers}
           currentUser={currentUser}
+          userBadges={userBadges}
+          vipUsers={vipUsers}
           onTriggerReaction={handleTriggerReaction}
           onOpenAdminModal={openAdminModal}
         />
@@ -1113,6 +1253,8 @@ export default function App() {
         onGrantCredits={handleGrantCredits}
         onToggleVip={handleToggleVip}
         isTargetVip={adminModalUser && (vipUsers[adminModalUser.id] || isAdminUser(adminModalUser))}
+        userBadges={userBadges}
+        onUpdateUserBadge={handleUpdateUserBadge}
       />
 
       {/* Master Top-Right Admin Panel Modal */}
@@ -1129,6 +1271,8 @@ export default function App() {
         seatedUsers={seatedUsers}
         availableSeats={availableSeats}
         vipUsers={vipUsers}
+        userBadges={userBadges}
+        onUpdateUserBadge={handleUpdateUserBadge}
         onMoveUser={handleAdminMoveUser}
         onKickUser={handleAdminKickUser}
         onGrantCredits={handleGrantCredits}

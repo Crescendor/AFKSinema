@@ -57,6 +57,8 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
   setStreamUrl,
   currentUser,
   messages = [],
+  userBadges = {},
+  vipUsers = {},
   activeMola = null,
   onSendMessage,
   onDeleteMessage

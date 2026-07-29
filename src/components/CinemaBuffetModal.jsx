@@ -28,22 +28,21 @@ export function CinemaBuffetModal({
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '540px', padding: '28px' }}>
-        {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '48px', height: '48px', borderRadius: '16px', background: 'linear-gradient(135deg, var(--cinema-red), #9f1239)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 16px var(--cinema-red-glow)' }}>
-              <ShoppingBag size={24} color="white" />
-            </div>
-            <div>
-              <h2 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.35rem', fontWeight: 900 }}>
-                Sinema Büfesi
-              </h2>
-              <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Kredilerinizle ikramlık alın, koltuğunuzda avatarınızın yanında görünsün!
-              </p>
-            </div>
-          </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={20} /></button>
+        {/* Large "The Büfeh" Header Banner */}
+        <div style={{ textAlign: 'center', marginBottom: '14px', position: 'relative' }}>
+          <button onClick={onClose} style={{ position: 'absolute', top: '0', right: '0', background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer', zIndex: 10 }}>
+            <X size={22} />
+          </button>
+          <img
+            src="/the_bufeh.png"
+            alt="AFK Sinema The Büfeh"
+            style={{
+              maxHeight: '160px',
+              maxWidth: '100%',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 20px rgba(225, 29, 72, 0.6)) drop-shadow(0 0 35px rgba(251, 191, 36, 0.4))'
+            }}
+          />
         </div>
 
         {/* Credit Balance */}

@@ -21,6 +21,8 @@ export function AdminMasterPanelModal({
   seatedUsers = {},
   availableSeats = [],
   vipUsers = {},
+  userBadges = {},
+  onUpdateUserBadge,
   onMoveUser,
   onKickUser,
   onGrantCredits,

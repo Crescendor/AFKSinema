@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
-import { Shield, UserX, ArrowRightLeft, Coins, Ban, Star, Check, X } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Shield, UserX, ArrowRightLeft, Coins, Ban, Star, Check, X, Tag, Smile } from 'lucide-react';
+
+const PRESET_BADGE_COLORS = ['#fbbf24', '#f43f5e', '#10b981', '#a855f7', '#38bdf8', '#f97316', '#ec4899'];
+const PRESET_BADGE_EMOJIS = ['👑', '⭐', '🍿', '🎬', '🔥', '💎', '🎭', '🍿', '🚀'];
 
 export function AdminControlsModal({
   isOpen,
@@ -11,11 +14,31 @@ export function AdminControlsModal({
   onKickUser,
   onGrantCredits,
   onToggleVip,
-  isTargetVip
+  isTargetVip,
+  userBadges = {},
+  onUpdateUserBadge
 }) {
   const [selectedNewSeat, setSelectedNewSeat] = useState('');
   const [kickDuration, setKickDuration] = useState('5');
   const [grantAmount, setGrantAmount] = useState(50);
+
+  // Badge Form State
+  const [badgeText, setBadgeText] = useState('');
+  const [badgeEmoji, setBadgeEmoji] = useState('👑');
+  const [badgeColor, setBadgeColor] = useState('#fbbf24');
+
+  useEffect(() => {
+    if (targetUser && userBadges[targetUser.id]) {
+      const b = userBadges[targetUser.id];
+      setBadgeText(b.text || '');
+      setBadgeEmoji(b.emoji || '👑');
+      setBadgeColor(b.color || '#fbbf24');
+    } else {
+      setBadgeText('');
+      setBadgeEmoji('👑');
+      setBadgeColor('#fbbf24');
+    }
+  }, [targetUser, userBadges]);
 
   if (!isOpen || !targetUser) return null;
 
@@ -48,9 +71,28 @@ export function AdminControlsModal({
     onClose();
   };
 
+  const handleSaveBadgeSubmit = (e) => {
+    e.preventDefault();
+    if (!onUpdateUserBadge) return;
+
+    if (!badgeText.trim()) {
+      onUpdateUserBadge(targetUser.id, null);
+      alert(`🏷️ ${targetUser.username} kullanıcısının özel rozeti kaldırıldı.`);
+    } else {
+      onUpdateUserBadge(targetUser.id, {
+        text: badgeText.trim(),
+        emoji: badgeEmoji,
+        color: badgeColor,
+        bg: `${badgeColor}33` // 20% opacity
+      });
+      alert(`🏷️ ${targetUser.username} için [${badgeEmoji} ${badgeText.trim()}] rozeti kaydedildi!`);
+    }
+    onClose();
+  };
+
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '460px', maxHeight: '90vh', overflowY: 'auto' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -68,7 +110,91 @@ export function AdminControlsModal({
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--text-dim)', cursor: 'pointer' }}><X size={18} /></button>
         </div>
 
-        {/* Section 0: Toggle VIP Membership */}
+        {/* Section 0: Custom Badge Manager */}
+        <form onSubmit={handleSaveBadgeSubmit} style={{ background: 'rgba(168, 85, 247, 0.1)', border: '1px solid rgba(168, 85, 247, 0.4)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
+          <div style={{ fontSize: '0.85rem', fontWeight: 800, color: '#c084fc', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+            <Tag size={16} /> Özel Kullanıcı Rozeti / Etiketi Düzenle
+          </div>
+
+          <div style={{ display: 'flex', gap: '6px', marginBottom: '8px' }}>
+            <input
+              type="text"
+              placeholder="Rozet Metni (Örn: Admin, Mısır Kralı)"
+              value={badgeText}
+              onChange={(e) => setBadgeText(e.target.value)}
+              style={{ flex: 1, background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '6px 8px', color: 'white', fontSize: '0.8rem' }}
+            />
+          </div>
+
+          {/* Emoji & Color Selectors */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {PRESET_BADGE_EMOJIS.map(em => (
+                <button
+                  key={em}
+                  type="button"
+                  onClick={() => setBadgeEmoji(em)}
+                  style={{
+                    background: badgeEmoji === em ? 'rgba(255,255,255,0.2)' : 'transparent',
+                    border: badgeEmoji === em ? '1px solid white' : 'none',
+                    borderRadius: '4px',
+                    padding: '2px 4px',
+                    cursor: 'pointer',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {em}
+                </button>
+              ))}
+            </div>
+
+            <div style={{ display: 'flex', gap: '4px' }}>
+              {PRESET_BADGE_COLORS.map(c => (
+                <div
+                  key={c}
+                  onClick={() => setBadgeColor(c)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    borderRadius: '50%',
+                    background: c,
+                    cursor: 'pointer',
+                    border: badgeColor === c ? '2px solid white' : 'none'
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Preview */}
+          {badgeText.trim() && (
+            <div style={{ marginBottom: '10px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+              Önizleme: <span style={{ color: badgeColor, background: `${badgeColor}33`, border: `1px solid ${badgeColor}`, padding: '2px 8px', borderRadius: '6px', fontWeight: 800 }}>{badgeEmoji} {badgeText.trim()}</span>
+            </div>
+          )}
+
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button type="submit" className="btn-cinema primary" style={{ flex: 1, padding: '6px', fontSize: '0.75rem', background: 'linear-gradient(135deg, #a855f7, #7e22ce)', borderColor: '#a855f7' }}>
+              Rozeti Kaydet
+            </button>
+            {userBadges[targetUser.id] && (
+              <button
+                type="button"
+                onClick={() => {
+                  onUpdateUserBadge(targetUser.id, null);
+                  setBadgeText('');
+                  onClose();
+                }}
+                className="btn-cinema"
+                style={{ padding: '6px 10px', fontSize: '0.75rem', color: '#ef4444' }}
+              >
+                Rozeti Sil
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Section 1: Toggle VIP Membership */}
         <div style={{ background: 'rgba(251, 191, 36, 0.12)', border: '1px solid var(--accent-gold)', borderRadius: '12px', padding: '12px', marginBottom: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -87,12 +213,12 @@ export function AdminControlsModal({
                 cursor: 'pointer'
               }}
             >
-              {isTargetVip ? 'VIP Kaldır' : '⭐ VIP Ver (+50 Kredi/10dk)'}
+              {isTargetVip ? 'VIP Kaldır' : '⭐ VIP Ver'}
             </button>
           </div>
         </div>
 
-        {/* Section 1: Relocate User */}
+        {/* Section 2: Relocate User */}
         <div style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <ArrowRightLeft size={16} /> Koltuk Değiştir
@@ -123,7 +249,7 @@ export function AdminControlsModal({
           </form>
         </div>
 
-        {/* Section 2: Grant Credits */}
+        {/* Section 3: Grant Credits */}
         <div style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.25)', borderRadius: '12px', padding: '14px', marginBottom: '12px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-gold)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <Coins size={16} /> Kullanıcıya Kredi Ver
@@ -151,7 +277,7 @@ export function AdminControlsModal({
           </form>
         </div>
 
-        {/* Section 3: Kick / Ban User */}
+        {/* Section 4: Kick / Ban User */}
         <div style={{ background: 'rgba(242,63,67,0.1)', border: '1px solid rgba(242,63,67,0.3)', borderRadius: '12px', padding: '14px' }}>
           <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--discord-red)', display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
             <UserX size={16} /> Kullanıcıyı Odadan At / Banla

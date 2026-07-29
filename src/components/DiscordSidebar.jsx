@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Image as ImageIcon, Smile, X, Link as LinkIcon, Trash2, Settings } from 'lucide-react';
+import { Send, Image as ImageIcon, Smile, X, Link as LinkIcon, Trash2, Settings, Reply, AtSign } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
@@ -15,16 +15,19 @@ export function DiscordSidebar({
   onDeleteMessage,
   seatedUsers,
   currentUser,
+  userBadges = {},
+  vipUsers = {},
   onTriggerReaction,
   onOpenAdminModal
 }) {
   const [activeTab, setActiveTab] = useState('chat');
   const [text, setText] = useState('');
-  
+  const [replyingTo, setReplyingTo] = useState(null);
+
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  
   const [imageUrlInput, setImageUrlInput] = useState('');
+
   const chatEndRef = useRef(null);
 
   useEffect(() => {
@@ -34,16 +37,30 @@ export function DiscordSidebar({
   const handleSendText = (e) => {
     e.preventDefault();
     if (!text.trim()) return;
-    onSendMessage({ text: text.trim(), type: 'text' });
+
+    onSendMessage({
+      text: text.trim(),
+      type: 'text',
+      replyTo: replyingTo ? { id: replyingTo.id, username: replyingTo.username, text: replyingTo.text } : null
+    });
+
     setText('');
+    setReplyingTo(null);
     setShowEmojiPicker(false);
   };
 
   const handleSendImage = (e) => {
     e.preventDefault();
     if (!imageUrlInput.trim()) return;
-    onSendMessage({ type: 'image', imageUrl: imageUrlInput.trim() });
+
+    onSendMessage({
+      type: 'image',
+      imageUrl: imageUrlInput.trim(),
+      replyTo: replyingTo ? { id: replyingTo.id, username: replyingTo.username, text: replyingTo.text } : null
+    });
+
     setImageUrlInput('');
+    setReplyingTo(null);
     setShowImageModal(false);
   };
 
@@ -52,7 +69,12 @@ export function DiscordSidebar({
     if (file) {
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
-        onSendMessage({ type: 'image', imageUrl: uploadEvent.target.result });
+        onSendMessage({
+          type: 'image',
+          imageUrl: uploadEvent.target.result,
+          replyTo: replyingTo ? { id: replyingTo.id, username: replyingTo.username, text: replyingTo.text } : null
+        });
+        setReplyingTo(null);
       };
       reader.readAsDataURL(file);
     }
@@ -64,36 +86,102 @@ export function DiscordSidebar({
     onTriggerReaction(emoji);
   };
 
-  const renderMessageContent = (msg) => {
-    if (msg.type === 'image') {
-      return (
-        <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', maxWidth: '240px', border: '1px solid rgba(255,255,255,0.1)' }}>
-          <img src={msg.imageUrl} alt="Attachment" style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
-        </div>
-      );
+  const insertMention = (username) => {
+    setText(prev => (prev ? `${prev} @${username} ` : `@${username} `));
+  };
+
+  const getUserBadge = (user) => {
+    if (!user) return null;
+    if (userBadges && userBadges[user.id]) {
+      return userBadges[user.id];
     }
+    if (isAdminUser(user)) {
+      return { text: 'Admin', emoji: '👑', color: '#fbbf24', bg: 'rgba(251, 191, 36, 0.2)' };
+    }
+    if (vipUsers && vipUsers[user.id]) {
+      return { text: 'VIP', emoji: '⭐', color: '#38bdf8', bg: 'rgba(56, 189, 248, 0.2)' };
+    }
+    return null;
+  };
 
+  const renderMessageTextWithMentions = (rawText) => {
+    if (!rawText) return null;
     const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const parts = (msg.text || '').split(urlRegex);
+    const parts = rawText.split(urlRegex);
 
+    return parts.map((part, idx) => {
+      if (part.match(urlRegex)) {
+        return (
+          <a
+            key={idx}
+            href={part}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--cinema-red)', textDecoration: 'underline', fontWeight: 600, wordBreak: 'break-all' }}
+          >
+            {part} <LinkIcon size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
+          </a>
+        );
+      }
+
+      // Parse mentions @username
+      const mentionRegex = /(@[A-Za-z0-9_ğüşıöçĞÜŞİÖÇ]+)/g;
+      const subParts = part.split(mentionRegex);
+
+      return subParts.map((sub, sIdx) => {
+        if (sub.startsWith('@')) {
+          const uname = sub.substring(1);
+          return (
+            <span
+              key={sIdx}
+              onClick={() => insertMention(uname)}
+              style={{
+                background: 'rgba(251, 191, 36, 0.2)',
+                border: '1px solid rgba(251, 191, 36, 0.4)',
+                color: 'var(--accent-gold)',
+                padding: '1px 6px',
+                borderRadius: '6px',
+                fontWeight: 800,
+                fontSize: '0.78rem',
+                cursor: 'pointer',
+                margin: '0 2px'
+              }}
+              title="Kullanıcıyı etiketlemek için tıkla"
+            >
+              {sub}
+            </span>
+          );
+        }
+        return sub;
+      });
+    });
+  };
+
+  const renderMessageContent = (msg) => {
     return (
       <div className="chat-msg-text">
-        {parts.map((part, idx) => {
-          if (part.match(urlRegex)) {
-            return (
-              <a
-                key={idx}
-                href={part}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ color: 'var(--cinema-red)', textDecoration: 'underline', fontWeight: 600, wordBreak: 'break-all' }}
-              >
-                {part} <LinkIcon size={12} style={{ display: 'inline', verticalAlign: 'middle' }} />
-              </a>
-            );
-          }
-          return part;
-        })}
+        {/* Reply Quote Banner */}
+        {msg.replyTo && (
+          <div style={{
+            background: 'rgba(255,255,255,0.06)',
+            borderLeft: '3px solid var(--cinema-red)',
+            padding: '4px 8px',
+            borderRadius: '4px',
+            fontSize: '0.72rem',
+            marginBottom: '6px',
+            color: 'var(--text-muted)'
+          }}>
+            <span style={{ color: 'var(--cinema-red)', fontWeight: 800 }}>@{msg.replyTo.username}</span> yanıtlandı: {msg.replyTo.text?.slice(0, 45)}
+          </div>
+        )}
+
+        {msg.type === 'image' ? (
+          <div style={{ marginTop: '6px', borderRadius: '10px', overflow: 'hidden', maxWidth: '240px', border: '1px solid rgba(255,255,255,0.1)' }}>
+            <img src={msg.imageUrl} alt="Attachment" style={{ width: '100%', display: 'block', borderRadius: '8px' }} />
+          </div>
+        ) : (
+          renderMessageTextWithMentions(msg.text)
+        )}
       </div>
     );
   };
@@ -146,34 +234,71 @@ export function DiscordSidebar({
               }
 
               const canDelete = currentUser && (msg.user?.id === currentUser.id || isAdmin);
+              const badge = getUserBadge(msg.user);
 
               return (
                 <div key={msg.id} className="chat-msg" style={{ position: 'relative' }}>
                   <img src={msg.user?.avatar} alt={msg.user?.username} className="chat-msg-avatar" />
                   <div className="chat-msg-content" style={{ flex: 1 }}>
                     <div className="chat-msg-user" style={{ justifyContent: 'space-between', width: '100%' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span>{msg.user?.username}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                        <span
+                          onClick={() => msg.user?.username && insertMention(msg.user.username)}
+                          style={{ cursor: 'pointer', fontWeight: 700 }}
+                          title="Etiketlemek için tıkla"
+                        >
+                          {msg.user?.username}
+                        </span>
+
+                        {/* Custom User Badge */}
+                        {badge && (
+                          <span style={{
+                            fontSize: '0.65rem',
+                            fontWeight: 800,
+                            color: badge.color || 'var(--accent-gold)',
+                            background: badge.bg || 'rgba(251,191,36,0.18)',
+                            border: `1px solid ${badge.color || 'var(--accent-gold)'}`,
+                            padding: '1px 6px',
+                            borderRadius: '6px',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            {badge.emoji} {badge.text}
+                          </span>
+                        )}
+
                         {msg.seatCode && <span className="chat-msg-seat-tag">{msg.seatCode}</span>}
                         <span style={{ fontSize: '0.65rem', color: 'var(--text-dim)' }}>{msg.time}</span>
                       </div>
 
-                      {canDelete && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {/* Reply Button */}
                         <button
-                          onClick={() => onDeleteMessage(msg.id)}
-                          style={{
-                            background: 'none',
-                            border: 'none',
-                            color: '#ef4444',
-                            cursor: 'pointer',
-                            padding: '2px 4px',
-                            opacity: 0.8
-                          }}
-                          title="Mesajı Sil"
+                          onClick={() => setReplyingTo({ id: msg.id, username: msg.user?.username || 'Kullanıcı', text: msg.text || '' })}
+                          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 4px' }}
+                          title="Mesaja Yanıt Ver"
                         >
-                          <Trash2 size={13} />
+                          <Reply size={13} />
                         </button>
-                      )}
+
+                        {canDelete && (
+                          <button
+                            onClick={() => onDeleteMessage(msg.id)}
+                            style={{
+                              background: 'none',
+                              border: 'none',
+                              color: '#ef4444',
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              opacity: 0.8
+                            }}
+                            title="Mesajı Sil"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {renderMessageContent(msg)}
@@ -183,6 +308,27 @@ export function DiscordSidebar({
             })}
             <div ref={chatEndRef} />
           </div>
+
+          {/* Replying Preview Banner */}
+          {replyingTo && (
+            <div style={{
+              background: 'rgba(225, 29, 72, 0.15)',
+              borderLeft: '3px solid var(--cinema-red)',
+              padding: '6px 12px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              fontSize: '0.75rem',
+              color: 'white'
+            }}>
+              <div>
+                <span style={{ color: 'var(--cinema-red)', fontWeight: 800 }}>@{replyingTo.username}</span> kullanıcısına yanıt veriliyor
+              </div>
+              <button onClick={() => setReplyingTo(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
+                <X size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Emoji Picker Popover */}
           {showEmojiPicker && (
@@ -290,6 +436,8 @@ export function DiscordSidebar({
           ) : (
             audienceList.map(({ seatCode, user }) => {
               const isMe = currentUser && currentUser.id === user.id;
+              const badge = getUserBadge(user);
+
               return (
                 <div
                   key={seatCode}
@@ -307,7 +455,15 @@ export function DiscordSidebar({
                     <img src={user.avatar} alt={user.username} style={{ width: '32px', height: '32px', borderRadius: '50%', objectFit: 'cover' }} />
                     <div>
                       <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {user.username} {isMe && <span style={{ fontSize: '0.65rem', color: '#34d399' }}>(Siz)</span>}
+                        <span onClick={() => insertMention(user.username)} style={{ cursor: 'pointer' }} title="Etiketle">
+                          {user.username}
+                        </span>
+                        {isMe && <span style={{ fontSize: '0.65rem', color: '#34d399' }}>(Siz)</span>}
+                        {badge && (
+                          <span style={{ fontSize: '0.62rem', fontWeight: 800, color: badge.color, background: badge.bg, border: `1px solid ${badge.color}`, padding: '1px 5px', borderRadius: '5px' }}>
+                            {badge.emoji} {badge.text}
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{user.role || 'İzleyici'}</div>
                     </div>
@@ -338,7 +494,7 @@ export function DiscordSidebar({
                           display: 'flex',
                           alignItems: 'center'
                         }}
-                        title="Kullanıcı Yönetimi (Taşı / At)"
+                        title="Kullanıcı Yönetimi (Taşı / At / Rozet)"
                       >
                         <Settings size={14} />
                       </button>
