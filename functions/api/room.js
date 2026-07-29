@@ -93,7 +93,9 @@ export async function onRequestGet(context) {
     activeMola:      config.activeMola      ?? null,
     moviePosters:    config.moviePosters    ?? null,
     buffetItems:     config.buffetItems     ?? null,
-    broadcasterName: config.broadcasterName ?? ''
+    broadcasterName:   config.broadcasterName   ?? '',
+    broadcasterPeerId: config.broadcasterPeerId ?? '',
+    streamUrl:         config.streamUrl         ?? ''
   });
 }
 
@@ -163,6 +165,10 @@ export async function onRequestPost(context) {
       const stmts = [];
       if (data.broadcasterName !== undefined)
         stmts.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('broadcasterName', JSON.stringify(data.broadcasterName)));
+      if (data.broadcasterPeerId !== undefined)
+        stmts.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('broadcasterPeerId', JSON.stringify(data.broadcasterPeerId)));
+      if (data.streamUrl !== undefined)
+        stmts.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('streamUrl', JSON.stringify(data.streamUrl)));
       if (data.activeMola !== undefined)
         stmts.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('activeMola', JSON.stringify(data.activeMola)));
       if (data.moviePosters !== undefined)

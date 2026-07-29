@@ -349,26 +349,57 @@ export function AdminMasterPanelModal({
           <div>
             <div style={{ background: 'rgba(0,0,0,0.4)', padding: '16px', borderRadius: '14px', border: '1px solid var(--bg-card-border)', marginBottom: '16px' }}>
               <div style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <Monitor size={18} /> Discord Yayın Ekranı Paylaşımı
+                <Monitor size={18} /> Canlı Ekran Paylaşımı (PeerJS WebRTC)
               </div>
 
               {isBroadcasting ? (
                 <div style={{ background: 'rgba(16, 185, 129, 0.15)', border: '1px solid #10b981', padding: '14px', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div style={{ fontSize: '0.85rem', color: '#34d399', fontWeight: 700 }}>
-                    🎥 Yayın Canlı! Yayıncı: {broadcasterName}
+                    🎥 Yayın Canlı! Yayıncı: {broadcasterName || 'Admin'}
                   </div>
                   <button onClick={onStopBroadcast} className="btn-cinema" style={{ background: '#ef4444', color: 'white', borderColor: '#ef4444', padding: '6px 12px', fontSize: '0.78rem' }}>
                     Yayını Durdur
                   </button>
                 </div>
               ) : (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
-                    Discord pencerenizi veya ekranınızı dev sinema perdesine yansıtın.
-                  </span>
-                  <button onClick={() => { onStartBroadcast(); onClose(); }} className="btn-cinema primary" style={{ padding: '8px 16px', fontSize: '0.82rem' }}>
-                    <Play size={16} /> Paylaşımı Başlat
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px' }}>
+                    <div>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'white' }}>⚡ Canlı Ekran Paylaşımı</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                        Discord, tarayıcı veya oyun ekranınızı PeerJS WebRTC ile salona canlı verin.
+                      </div>
+                    </div>
+                    <button onClick={() => { onStartBroadcast(); onClose(); }} className="btn-cinema primary" style={{ padding: '8px 16px', fontSize: '0.82rem', whitespace: 'nowrap' }}>
+                      <Play size={16} /> Paylaşımı Başlat
+                    </button>
+                  </div>
+
+                  <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '12px' }}>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--accent-gold)', marginBottom: '6px' }}>
+                      🔗 Veya Harici Canlı Yayın / Video URL'si Girin:
+                    </div>
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <input
+                        type="url"
+                        placeholder="YouTube, Twitch veya HLS/Iframe Video Linki..."
+                        defaultValue={streamUrl || ''}
+                        id="input_admin_stream_url"
+                        style={{ flex: 1, background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '8px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
+                      />
+                      <button
+                        onClick={() => {
+                          const val = document.getElementById('input_admin_stream_url')?.value || '';
+                          onSetStreamUrl(val, 'Admin');
+                          onClose();
+                        }}
+                        className="btn-cinema primary"
+                        style={{ padding: '8px 14px', fontSize: '0.78rem' }}
+                      >
+                        Yayına Ver
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

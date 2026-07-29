@@ -95,6 +95,8 @@ export default function App() {
   const [tempDiscordUser, setTempDiscordUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
+  const [broadcasterPeerId, setBroadcasterPeerId] = useState('');
+  const [streamUrl, setStreamUrl] = useState('');
   const [lightsDimmed, setLightsDimmed] = useState(false);
 
   const [isBuffetModalOpen, setIsBuffetModalOpen] = useState(false);
@@ -254,6 +256,12 @@ export default function App() {
 
           if (room.broadcasterName !== undefined) {
             setBroadcasterName(room.broadcasterName);
+          }
+          if (room.broadcasterPeerId !== undefined) {
+            setBroadcasterPeerId(room.broadcasterPeerId || '');
+          }
+          if (room.streamUrl !== undefined) {
+            setStreamUrl(room.streamUrl || '');
           }
         }
       } catch (err) {
@@ -875,10 +883,30 @@ export default function App() {
     setIsAdminModalOpen(true);
   };
 
+  // Set/clear the stream URL and sync to D1 for all users
+  const handleSetStreamUrl = (url, broadcasterDisplayName) => {
+    const safeUrl = url || '';
+    const safeName = broadcasterDisplayName || '';
+    setStreamUrl(safeUrl);
+    setBroadcasterName(safeName);
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SYNC_STATE', data: { streamUrl: safeUrl, broadcasterName: safeName, broadcasterPeerId: '' } })
+    }).catch(() => {});
+  };
+
   const handleTriggerStartBroadcast = () => {
     if (cinemaScreenRef.current && cinemaScreenRef.current.startBroadcast) {
       cinemaScreenRef.current.startBroadcast();
     }
+  };
+
+  const handleTriggerStopBroadcast = () => {
+    if (cinemaScreenRef.current && cinemaScreenRef.current.stopBroadcast) {
+      cinemaScreenRef.current.stopBroadcast();
+    }
+    handleSetStreamUrl('', '');
   };
 
   const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
@@ -973,6 +1001,10 @@ export default function App() {
             setLightsDimmed={setLightsDimmed}
             broadcasterName={broadcasterName}
             setBroadcasterName={setBroadcasterName}
+            broadcasterPeerId={broadcasterPeerId}
+            setBroadcasterPeerId={setBroadcasterPeerId}
+            streamUrl={streamUrl}
+            setStreamUrl={setStreamUrl}
             currentUser={currentUser}
             messages={messages}
             activeMola={activeMola}
@@ -1107,10 +1139,13 @@ export default function App() {
         onDeleteBuffetItem={handleDeleteBuffetItem}
         creditSettings={creditSettings}
         onUpdateCreditSettings={handleUpdateCreditSettings}
-        isBroadcasting={!!broadcasterName}
+        isBroadcasting={!!broadcasterName || !!broadcasterPeerId || !!streamUrl}
         broadcasterName={broadcasterName}
+        broadcasterPeerId={broadcasterPeerId}
         onStartBroadcast={handleTriggerStartBroadcast}
-        onStopBroadcast={() => setBroadcasterName('')}
+        onStopBroadcast={handleTriggerStopBroadcast}
+        streamUrl={streamUrl}
+        onSetStreamUrl={handleSetStreamUrl}
         lightsDimmed={lightsDimmed}
         onToggleLights={() => setLightsDimmed(!lightsDimmed)}
       />
