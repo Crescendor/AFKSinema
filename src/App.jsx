@@ -559,9 +559,10 @@ export default function App() {
     });
   };
 
+  // APPEND NEW POSTERS TO THE BOTTOM OF THE LIST
   const handleAddMoviePoster = (newPoster) => {
     setMoviePosters(prev => {
-      const updated = [newPoster, ...prev];
+      const updated = [...prev, newPoster];
       fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

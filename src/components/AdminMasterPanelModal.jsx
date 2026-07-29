@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Trash2, Ban, X, Play, Square, Calendar, Lightbulb, Smile, Edit2, Check, Clock, Coins } from 'lucide-react';
+import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Trash2, Ban, X, Play, Square, Calendar, Lightbulb, Smile, Edit2, Check, Clock, Coins, GripVertical } from 'lucide-react';
 
 const BUFFET_EMOJI_PALETTE = [
   '🍿', '🥤', '🍦', '🍫', '🍺', '👑', '🍕', '🍔', 
@@ -11,7 +11,7 @@ const BUFFET_EMOJI_PALETTE = [
 export function AdminMasterPanelModal({
   isOpen,
   onClose,
-  moviePosters,
+  moviePosters = [],
   onAddMoviePoster,
   onUpdateMoviePosters,
   onDeleteMoviePoster,
@@ -45,6 +45,9 @@ export function AdminMasterPanelModal({
   const [movieImageUrl, setMovieImageUrl] = useState('');
   const [movieDateTime, setMovieDateTime] = useState('');
   const [isTBDDate, setIsTBDDate] = useState(false);
+
+  // Poster Drag & Drop State
+  const [draggedIndex, setDraggedIndex] = useState(null);
 
   // Poster Editing State
   const [editingPosterId, setEditingPosterId] = useState(null);
@@ -125,13 +128,38 @@ export function AdminMasterPanelModal({
       title: movieTitle.trim(),
       imageUrl: movieImageUrl.trim(),
       releaseDate: formattedDate,
-      status: 'Yakında' // ALWAYS DEFAULT TO YAKINDA! NEVER OYNATILIYOR!
+      status: 'Yakında' // ALWAYS DEFAULT TO YAKINDA! APPENDED TO BOTTOM!
     });
 
     setMovieTitle('');
     setMovieImageUrl('');
     setMovieDateTime('');
     setIsTBDDate(false);
+  };
+
+  // Drag and Drop Poster Handlers
+  const handleDragStart = (e, index) => {
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  };
+
+  const handleDrop = (e, targetIndex) => {
+    e.preventDefault();
+    if (draggedIndex === null || draggedIndex === targetIndex) return;
+
+    const updated = [...moviePosters];
+    const [draggedItem] = updated.splice(draggedIndex, 1);
+    updated.splice(targetIndex, 0, draggedItem);
+
+    if (onUpdateMoviePosters) {
+      onUpdateMoviePosters(updated);
+    }
+    setDraggedIndex(null);
   };
 
   const handleStartEditPoster = (p) => {
@@ -272,7 +300,7 @@ export function AdminMasterPanelModal({
                 👑 VIP Admin Ana Kontrol Paneli
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Yayın, afişler, mola, dakikalık kredi ayarları ve büfe yönetimi
+                Yayın, afişler (sürükle-bırak sıralamalı), mola, kredi ayarları ve büfe
               </p>
             </div>
           </div>
@@ -356,12 +384,12 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 1: MOVIE POSTERS, DATETIME PICKER & SEANCE CONTROL */}
+        {/* TAB 1: MOVIE POSTERS, DATETIME PICKER & DRAG-AND-DROP REORDERING */}
         {activeTab === 'movies' && (
           <div>
             <form onSubmit={handleAddPosterSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--bg-card-border)' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '10px' }}>
-                + Yeni Film Afişi Ekle (Varsayılan: Yakında)
+                + Yeni Film Afişi Ekle (Listenin En Altına Eklenir)
               </div>
 
               <div style={{ marginBottom: '8px' }}>
@@ -416,15 +444,33 @@ export function AdminMasterPanelModal({
               </div>
 
               <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '8px', fontSize: '0.82rem', justifyContent: 'center' }}>
-                Afişi Liste-ye Ekle (🍿 Yakında)
+                Afişi En Alta Ekle (🍿 Yakında)
               </button>
             </form>
 
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <GripVertical size={14} color="var(--accent-gold)" /> Sürükle & Bırak ile seans sırasını değiştirebilirsiniz:
+            </div>
+
+            {/* DRAGGABLE POSTER LIST */}
             <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {moviePosters.map(p => (
-                <div key={p.id} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+              {moviePosters.map((p, idx) => (
+                <div
+                  key={p.id}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, idx)}
+                  onDragOver={handleDragOver}
+                  onDrop={(e) => handleDrop(e, idx)}
+                  style={{
+                    padding: '8px 12px',
+                    background: draggedIndex === idx ? 'rgba(225, 29, 72, 0.25)' : 'rgba(255,255,255,0.03)',
+                    borderRadius: '8px',
+                    border: `1px ${draggedIndex === idx ? 'dashed var(--cinema-red)' : 'solid rgba(255,255,255,0.06)'}`,
+                    cursor: 'grab'
+                  }}
+                >
                   {editingPosterId === p.id ? (
-                    /* Inline Poster Edit Form with Datetime Picker */
+                    /* Inline Poster Edit Form */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                       <input
                         type="text"
@@ -469,9 +515,12 @@ export function AdminMasterPanelModal({
                       </div>
                     </div>
                   ) : (
-                    /* Normal Poster Row with Seansı Başlat / Seansı Bitir Buttons */
+                    /* Normal Draggable Poster Row */
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ color: 'var(--text-dim)', cursor: 'grab' }} title="Sürükleyerek sırasını değiştirin">
+                          <GripVertical size={16} />
+                        </div>
                         <img src={p.imageUrl} alt={p.title} style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px' }} />
                         <div>
                           <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
