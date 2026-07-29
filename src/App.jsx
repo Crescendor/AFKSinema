@@ -308,7 +308,8 @@ export default function App() {
           setTempDiscordUser(profile);
           setIsLoginModalOpen(true);
         }
-        window.history.replaceState(null, '', window.location.pathname.replace(/\/callback\/?$/, '/'));
+        // Set visible browser URL to /sinema
+        window.history.replaceState(null, '', '/sinema');
       });
     } else if (hash && hash.includes('access_token')) {
       const params = new URLSearchParams(hash.substring(1));
@@ -319,7 +320,8 @@ export default function App() {
             setTempDiscordUser(profile);
             setIsLoginModalOpen(true);
           }
-          window.history.replaceState(null, '', window.location.pathname.replace(/\/callback\/?$/, '/'));
+          // Set visible browser URL to /sinema
+          window.history.replaceState(null, '', '/sinema');
         });
       }
     }
@@ -388,6 +390,8 @@ export default function App() {
 
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
+    // Update browser URL bar to /sinema
+    window.history.replaceState(null, '', '/sinema');
 
     if (!userCredits[finalUser.id]) {
       setUserCredits(prev => ({ ...prev, [finalUser.id]: 50 }));
