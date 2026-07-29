@@ -8,6 +8,7 @@ import { AdminMasterPanelModal } from './components/AdminMasterPanelModal';
 import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { MolaModal } from './components/MolaModal';
 import { UserProfileModal } from './components/UserProfileModal';
+import { LegalModal } from './components/LegalModal';
 import { MovieBillboardLeft } from './components/MovieBillboardLeft';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
 import { LogIn, Coins, Shield } from 'lucide-react';
@@ -195,6 +196,28 @@ export default function App() {
   const [adminModalUser, setAdminModalUser] = useState(null);
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
+
+  // Legal Modal State (Privacy Policy / Terms of Service)
+  const [legalModalType, setLegalModalType] = useState(null);
+
+  useEffect(() => {
+    const path = window.location.pathname.toLowerCase();
+    if (path.includes('privacy')) {
+      setLegalModalType('privacy');
+    } else if (path.includes('terms')) {
+      setLegalModalType('terms');
+    }
+  }, []);
+
+  const openLegalModal = (type) => {
+    setLegalModalType(type);
+    window.history.pushState(null, '', `/${type}`);
+  };
+
+  const closeLegalModal = () => {
+    setLegalModalType(null);
+    window.history.pushState(null, '', '/');
+  };
 
   // Screen Share Trigger Ref
   const cinemaScreenRef = useRef(null);
@@ -1228,17 +1251,33 @@ export default function App() {
       {/* Site Footer */}
       <footer style={{
         textAlign: 'center',
-        padding: '14px',
+        padding: '12px 20px',
         background: 'rgba(10, 4, 7, 0.95)',
         borderTop: '1px solid var(--bg-card-border)',
-        fontSize: '0.82rem',
+        fontSize: '0.8rem',
         color: 'var(--text-muted)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: '6px'
+        gap: '16px',
+        flexWrap: 'wrap',
+        zIndex: 10
       }}>
-        Dox tarafından AFK için Sevgiyle üretildi - 2026
+        <span>Dox tarafından AFK için Sevgiyle üretildi • 2026</span>
+        <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+        <button
+          onClick={() => openLegalModal('privacy')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.8rem' }}
+        >
+          Gizlilik Politikası (Privacy Policy)
+        </button>
+        <span style={{ color: 'rgba(255,255,255,0.2)' }}>|</span>
+        <button
+          onClick={() => openLegalModal('terms')}
+          style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', textDecoration: 'underline', fontSize: '0.8rem' }}
+        >
+          Kullanım Koşulları (Terms of Service)
+        </button>
       </footer>
 
       <DiscordLoginModal
@@ -1332,6 +1371,12 @@ export default function App() {
         onSetStreamUrl={handleSetStreamUrl}
         lightsDimmed={lightsDimmed}
         onToggleLights={() => setLightsDimmed(!lightsDimmed)}
+      />
+
+      <LegalModal
+        isOpen={!!legalModalType}
+        type={legalModalType}
+        onClose={closeLegalModal}
       />
     </div>
   );
