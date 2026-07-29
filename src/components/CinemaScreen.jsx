@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Eye } from 'lucide-react';
+import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Eye, Trash2 } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
@@ -11,7 +11,8 @@ export function CinemaScreen({
   currentUser,
   messages = [],
   activeMola = null,
-  onSendMessage
+  onSendMessage,
+  onDeleteMessage
 }) {
   const [stream, setStream] = useState(null);
   const [colorGlow, setColorGlow] = useState('rgba(225, 29, 72, 0.4)');
@@ -256,7 +257,7 @@ export function CinemaScreen({
                   ref={videoRef}
                   autoPlay
                   playsInline
-                  muted={isAdmin} // Mute local preview for broadcaster to avoid mic loopback
+                  muted={isAdmin}
                   className="screen-video"
                   style={{ width: '100%', height: '100%', objectFit: 'contain' }}
                 />
@@ -312,7 +313,7 @@ export function CinemaScreen({
           </div>
         </div>
 
-        {/* FULLSCREEN CHAT SIDE PANEL (Shrinks video when open!) */}
+        {/* FULLSCREEN CHAT SIDE PANEL (With Message Deletion Support!) */}
         {isFullscreen && isFsChatOpen && (
           <div style={{
             width: '320px',
@@ -346,25 +347,47 @@ export function CinemaScreen({
               </button>
             </div>
 
-            {/* Chat Messages Feed */}
+            {/* Chat Messages Feed with Delete Button */}
             <div ref={chatScrollRef} style={{ flex: 1, padding: '12px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {messages.map((m) => (
-                <div key={m.id} style={{ display: 'flex', gap: '8px', background: m.type === 'system' ? 'rgba(225,29,72,0.1)' : 'rgba(255,255,255,0.04)', padding: '6px 8px', borderRadius: '8px' }}>
-                  {m.user?.avatar && (
-                    <img src={m.user.avatar} alt={m.user.username} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
-                  )}
-                  <div style={{ flex: 1, overflow: 'hidden' }}>
-                    {m.user && (
-                      <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--cinema-red)' }}>
-                        {m.user.username} {m.seatCode ? `[${m.seatCode}]` : ''}
-                      </div>
+              {messages.map((m) => {
+                const canDelete = currentUser && (isAdmin || (m.user && m.user.id === currentUser.id));
+
+                return (
+                  <div key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', background: m.type === 'system' ? 'rgba(225,29,72,0.1)' : 'rgba(255,255,255,0.04)', padding: '6px 8px', borderRadius: '8px', position: 'relative' }}>
+                    {m.user?.avatar && (
+                      <img src={m.user.avatar} alt={m.user.username} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                     )}
-                    <div style={{ fontSize: '0.78rem', color: m.type === 'system' ? 'var(--accent-gold)' : 'white', wordBreak: 'break-word' }}>
-                      {m.text}
+                    <div style={{ flex: 1, overflow: 'hidden' }}>
+                      {m.user && (
+                        <div style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--cinema-red)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span>{m.user.username} {m.seatCode ? `[${m.seatCode}]` : ''}</span>
+                        </div>
+                      )}
+                      <div style={{ fontSize: '0.78rem', color: m.type === 'system' ? 'var(--accent-gold)' : 'white', wordBreak: 'break-word' }}>
+                        {m.text}
+                      </div>
                     </div>
+
+                    {/* Delete Message Button */}
+                    {canDelete && m.type !== 'system' && onDeleteMessage && (
+                      <button
+                        onClick={() => onDeleteMessage(m.id)}
+                        title="Mesajı Sil"
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: '#ef4444',
+                          cursor: 'pointer',
+                          opacity: 0.8,
+                          padding: '2px'
+                        }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Input Form */}

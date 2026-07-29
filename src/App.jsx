@@ -708,7 +708,6 @@ export default function App() {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
-  // Real-Time Floating Reactions (Directly above the seated user avatar head!)
   const handleTriggerReaction = (emoji) => {
     let mySeatCode = null;
 
@@ -843,6 +842,7 @@ export default function App() {
             messages={messages}
             activeMola={activeMola}
             onSendMessage={handleSendMessage}
+            onDeleteMessage={handleDeleteMessage}
           />
 
           <CinemaAuditorium
