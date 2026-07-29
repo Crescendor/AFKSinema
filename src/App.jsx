@@ -315,30 +315,6 @@ export default function App() {
     localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters));
   }, [moviePosters]);
 
-  // Auto-seat: when currentUser first appears and they have no seat yet — put them in A1 or first free seat
-  const autoSeatDoneRef = useRef(false);
-  useEffect(() => {
-    if (currentUser && !autoSeatDoneRef.current) {
-      autoSeatDoneRef.current = true;
-      // Find the first available seat
-      const ALL_CODES = [
-        'A1','A2','A3','A4','A5','A6','A7','A8',
-        'B1','B2','B3','B4','B5','B6','B7','B8','B9','B10',
-        'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10',
-        'D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
-        'E1','E2','E3','E4','E5','E6','E7','E8','E9','E10'
-      ];
-      const takenByOthers = Object.entries(seatedUsersRef.current)
-        .filter(([, u]) => u && u.id !== currentUser.id)
-        .map(([code]) => code);
-      const freeSeat = ALL_CODES.find(c => !takenByOthers.includes(c)) || 'A1';
-      // Small delay to let KV state load first
-      setTimeout(() => handleSelectSeat(freeSeat), 300);
-    }
-    if (!currentUser) {
-      autoSeatDoneRef.current = false;
-    }
-  }, [currentUser]);
 
   // Dynamic Seance Credit Loop: Awarded based on Admin-configured minute interval & credit amounts ONLY when seance is ACTIVE AND user is SEATED!
   useEffect(() => {
@@ -499,29 +475,36 @@ export default function App() {
       setUserCredits(prev => ({ ...prev, [finalUser.id]: 50 }));
     }
 
-    const seatToOccupy = targetSeatCode || 'A1';
-    
-    const updated = {};
-    Object.entries(seatedUsers).forEach(([code, u]) => {
-      if (u.id !== finalUser.id) updated[code] = u;
-    });
-    updated[seatToOccupy] = finalUser;
-    const sanitized = sanitizeSeatedUsers(updated);
-    setSeatedUsers(sanitized);
+    // Eğer kullanıcı giriş yapmadan önce bir koltuğa tıkladıysa, o koltuğa oturt
+    if (targetSeatCode) {
+      const updated = {};
+      Object.entries(seatedUsers).forEach(([code, u]) => {
+        if (u.id !== finalUser.id) updated[code] = u;
+      });
+      updated[targetSeatCode] = finalUser;
+      setSeatedUsers(sanitizeSeatedUsers(updated));
 
-    fetch('/api/room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: seatToOccupy, user: finalUser } })
-    }).catch(() => {});
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: targetSeatCode, user: finalUser } })
+      }).catch(() => {});
 
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `${finalUser.username} salona katıldı ve ${seatToOccupy} koltuğuna oturdu 🍿`
-    }]);
+      setMessages(prev => [...prev, {
+        id: 'sys_' + Date.now(),
+        type: 'system',
+        text: `${finalUser.username} salona katıldı ve ${targetSeatCode} koltuğuna oturdu 🍿`
+      }]);
 
-    setTargetSeatCode(null);
+      setTargetSeatCode(null);
+    } else {
+      // Koltuk seçimi yapılmamış — sadece salona katıldı mesajı
+      setMessages(prev => [...prev, {
+        id: 'sys_' + Date.now(),
+        type: 'system',
+        text: `${finalUser.username} salona katıldı 🎬`
+      }]);
+    }
   };
 
   const handleUpdateNickname = (newNickname) => {
