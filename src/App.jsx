@@ -278,11 +278,11 @@ export default function App() {
 
         Object.entries(updated).forEach(([userId, slots]) => {
           const newSlots = { ...slots };
-          if (newSlots.left && now > newSlots.left.expireTime) {
+          if (newSlots.left && (now > newSlots.left.expireTime || newSlots.left.bitesLeft <= 0)) {
             newSlots.left = null;
             changed = true;
           }
-          if (newSlots.right && now > newSlots.right.expireTime) {
+          if (newSlots.right && (now > newSlots.right.expireTime || newSlots.right.bitesLeft <= 0)) {
             newSlots.right = null;
             changed = true;
           }
@@ -291,7 +291,7 @@ export default function App() {
 
         return changed ? updated : prev;
       });
-    }, 15000);
+    }, 10000);
 
     return () => clearInterval(expiryInterval);
   }, []);
@@ -308,7 +308,6 @@ export default function App() {
           setTempDiscordUser(profile);
           setIsLoginModalOpen(true);
         }
-        // Set visible browser URL to /sinema
         window.history.replaceState(null, '', '/sinema');
       });
     } else if (hash && hash.includes('access_token')) {
@@ -320,7 +319,6 @@ export default function App() {
             setTempDiscordUser(profile);
             setIsLoginModalOpen(true);
           }
-          // Set visible browser URL to /sinema
           window.history.replaceState(null, '', '/sinema');
         });
       }
@@ -390,7 +388,6 @@ export default function App() {
 
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
-    // Update browser URL bar to /sinema
     window.history.replaceState(null, '', '/sinema');
 
     if (!userCredits[finalUser.id]) {
@@ -462,6 +459,7 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
+  // Buy Snack with 20 Bites Rule & 20 Min Expiry
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -471,17 +469,18 @@ export default function App() {
     }
 
     const expireTime = Date.now() + SNACK_EXPIRY_MS;
+    const initialBites = 20; // 20 bites per purchased snack
 
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
-      const isLeftEmpty = !existing.left || Date.now() > existing.left.expireTime;
+      const isLeftEmpty = !existing.left || Date.now() > existing.left.expireTime || existing.left.bitesLeft <= 0;
       const targetSlot = isLeftEmpty ? 'left' : 'right';
 
       return {
         ...prev,
         [userId]: {
           ...existing,
-          [targetSlot]: { icon: item.icon, expireTime }
+          [targetSlot]: { icon: item.icon, expireTime, bitesLeft: initialBites }
         }
       };
     });
@@ -489,23 +488,36 @@ export default function App() {
     setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
       type: 'system',
-      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı! (20 Dakika Süreli)`
+      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı! (20 Yeme veya 20 Dk Süreli)`
     }]);
   };
 
+  // Consume Popcorn (Decrement bitesLeft by 1, clear if <= 0)
   const handleConsumePopcorn = () => {
     if (!currentUser) return;
     const userId = currentUser.id;
 
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
-      let newLeft = existing.left;
-      let newRight = existing.right;
+      let newLeft = existing.left ? { ...existing.left } : null;
+      let newRight = existing.right ? { ...existing.right } : null;
 
-      if (existing.left && (existing.left.icon === '🍿' || existing.left.icon === '👑')) {
-        newLeft = null;
-      } else if (existing.right && (existing.right.icon === '🍿' || existing.right.icon === '👑')) {
-        newRight = null;
+      const isPopcorn = (icon) => icon === '🍿' || icon === '👑';
+
+      if (newLeft && isPopcorn(newLeft.icon)) {
+        const remaining = (newLeft.bitesLeft ?? 20) - 1;
+        if (remaining <= 0) {
+          newLeft = null;
+        } else {
+          newLeft.bitesLeft = remaining;
+        }
+      } else if (newRight && isPopcorn(newRight.icon)) {
+        const remaining = (newRight.bitesLeft ?? 20) - 1;
+        if (remaining <= 0) {
+          newRight = null;
+        } else {
+          newRight.bitesLeft = remaining;
+        }
       }
 
       return {

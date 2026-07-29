@@ -104,17 +104,19 @@ export function CinemaAuditorium({
                 >
                   <div className="seat-headrest" />
 
-                  {/* Left & Right Buffet Snack Items beside Avatar */}
+                  {/* Left & Right Buffet Snack Items beside Avatar (LARGER FONT SIZE) */}
                   {occupant && (
                     <>
                       {snacks.left && snacks.left.icon && (
                         <div style={{
                           position: 'absolute',
-                          left: '-14px',
-                          top: '-10px',
-                          fontSize: '1rem',
-                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
-                          zIndex: 15
+                          left: '-20px',
+                          top: '-14px',
+                          fontSize: '1.5rem',
+                          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.9))',
+                          zIndex: 20,
+                          transform: 'scale(1.1)',
+                          animation: 'pulse 2s infinite'
                         }}>
                           {snacks.left.icon}
                         </div>
@@ -127,11 +129,13 @@ export function CinemaAuditorium({
                       {snacks.right && snacks.right.icon && (
                         <div style={{
                           position: 'absolute',
-                          right: '-14px',
-                          top: '-10px',
-                          fontSize: '1rem',
-                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.8))',
-                          zIndex: 15
+                          right: '-20px',
+                          top: '-14px',
+                          fontSize: '1.5rem',
+                          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.9))',
+                          zIndex: 20,
+                          transform: 'scale(1.1)',
+                          animation: 'pulse 2s infinite'
                         }}>
                           {snacks.right.icon}
                         </div>

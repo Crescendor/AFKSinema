@@ -20,8 +20,16 @@ export function InteractionsOverlay({
     });
   };
 
-  const hasPopcorn = (mySnacks.left?.icon === '🍿' || mySnacks.left?.icon === '👑') ||
-                    (mySnacks.right?.icon === '🍿' || mySnacks.right?.icon === '👑');
+  const leftSnack = mySnacks.left;
+  const rightSnack = mySnacks.right;
+
+  const isPopcornIcon = (icon) => icon === '🍿' || icon === '👑';
+
+  const popcornSnack = (leftSnack && isPopcornIcon(leftSnack.icon)) ? leftSnack :
+                       (rightSnack && isPopcornIcon(rightSnack.icon)) ? rightSnack : null;
+
+  const hasPopcorn = !!popcornSnack;
+  const remainingBites = popcornSnack ? (popcornSnack.bitesLeft ?? 20) : 0;
 
   const handleEatPopcornClick = () => {
     if (!hasPopcorn) {
@@ -60,14 +68,14 @@ export function InteractionsOverlay({
           <ShoppingBag size={16} /> Sinema Büfesi
         </button>
 
-        {/* Popcorn Eat button */}
+        {/* Popcorn Eat button with 20-Bites Counter */}
         <button
           className="btn-cinema"
           onClick={handleEatPopcornClick}
           style={{ opacity: hasPopcorn ? 1 : 0.65, border: hasPopcorn ? '1px solid var(--accent-gold)' : '1px solid rgba(255,255,255,0.1)' }}
-          title={hasPopcorn ? 'Mısır Ye! 🍿' : 'Mısırınız yok! Büfeden satın alın.'}
+          title={hasPopcorn ? `Mısır Ye! (Kalan: ${remainingBites}/20 Hak veya 20 Dk Süre)` : 'Mısırınız yok! Büfeden satın alın.'}
         >
-          🍿 {hasPopcorn ? 'Mısır Ye' : 'Mısır Al'}
+          🍿 {hasPopcorn ? `Mısır Ye (${remainingBites}/20)` : 'Mısır Al'}
         </button>
 
         <button className="btn-cinema" onClick={() => { sounds.playApplause(); onTriggerReaction('👏'); }}>

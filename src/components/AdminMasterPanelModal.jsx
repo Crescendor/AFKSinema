@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Plus, Trash2, ArrowRightLeft, Coins, Star, Ban, X, Play, Square, Calendar, Lightbulb } from 'lucide-react';
+import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Plus, Trash2, ArrowRightLeft, Coins, Star, Ban, X, Play, Square, Calendar, Lightbulb, Smile } from 'lucide-react';
+
+const BUFFET_EMOJI_PALETTE = [
+  '🍿', '🥤', '🍦', '🍫', '🍺', '👑', '🍕', '🍔', 
+  '🌭', '🍟', '🍩', '🍪', '🍰', '🧃', '☕', '🍵', 
+  '🍇', '🍎', '🍓', '🥭', '🥨', '🌮', '🧋', '🥐', 
+  '🥪', '🍜', '🍱', '🍧', '🍬', '🍭', '🍸', '🍷'
+];
 
 export function AdminMasterPanelModal({
   isOpen,
@@ -425,27 +432,65 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 4: BUFFET ITEMS */}
+        {/* TAB 4: BUFFET ITEMS & EMOJI SELECTION */}
         {activeTab === 'buffet' && (
           <div>
             <form onSubmit={handleAddBuffetSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--bg-card-border)' }}>
-              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '8px' }}>
-                + Büfeye Ürün Ekle
+              <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Smile size={16} /> + Büfeye Ürün Ekle (Emoji Seçimli)
               </div>
+
+              {/* Interactive Emoji Palette */}
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '6px' }}>
+                Ürün Emojisi Seçin:
+              </div>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(8, 1fr)',
+                gap: '4px',
+                marginBottom: '10px',
+                background: 'rgba(0,0,0,0.5)',
+                padding: '8px',
+                borderRadius: '8px',
+                maxHeight: '90px',
+                overflowY: 'auto'
+              }}>
+                {BUFFET_EMOJI_PALETTE.map(emoji => (
+                  <button
+                    key={emoji}
+                    type="button"
+                    onClick={() => setBuffetIcon(emoji)}
+                    style={{
+                      fontSize: '1.2rem',
+                      background: buffetIcon === emoji ? 'var(--cinema-red)' : 'rgba(255,255,255,0.06)',
+                      border: buffetIcon === emoji ? '1px solid white' : 'none',
+                      borderRadius: '6px',
+                      padding: '4px',
+                      cursor: 'pointer',
+                      transition: 'transform 0.1s'
+                    }}
+                  >
+                    {emoji}
+                  </button>
+                ))}
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '60px 1fr 80px', gap: '6px', marginBottom: '8px' }}>
-                <input type="text" placeholder="Simge" value={buffetIcon} onChange={(e) => setBuffetIcon(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px', color: 'white', textAlign: 'center' }} />
+                <input type="text" placeholder="Simge" value={buffetIcon} onChange={(e) => setBuffetIcon(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px', color: 'white', textAlign: 'center', fontSize: '1.1rem' }} />
                 <input type="text" placeholder="Ürün Adı" value={buffetName} onChange={(e) => setBuffetName(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px', color: 'white' }} />
                 <input type="number" placeholder="Fiyat" value={buffetPrice} onChange={(e) => setBuffetPrice(e.target.value)} style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '6px', color: 'white' }} />
               </div>
               <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '6px', fontSize: '0.75rem', justifyContent: 'center' }}>
-                Ürünü Büfeye Tanımla
+                Ürünü Büfeye Tanımla ({buffetIcon})
               </button>
             </form>
 
-            <div style={{ maxHeight: '200px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {buffetItems.map(item => (
                 <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>{item.icon} {item.name} ({item.price} 🪙)</div>
+                  <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '1.2rem' }}>{item.icon}</span> {item.name} ({item.price} 🪙)
+                  </div>
                   <button onClick={() => onDeleteBuffetItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={13} /></button>
                 </div>
               ))}
