@@ -11,7 +11,7 @@ import { UserProfileModal } from './components/UserProfileModal';
 import { MovieBillboardLeft } from './components/MovieBillboardLeft';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
 import { LogIn, Coins, Shield } from 'lucide-react';
-import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser } from './utils/discordAuth';
+import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser, initDiscordActivitySdk } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
   'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7', 'A8',
@@ -254,6 +254,21 @@ export default function App() {
   const seatedUsersRef = useRef(seatedUsers);
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   useEffect(() => { seatedUsersRef.current = seatedUsers; }, [seatedUsers]);
+
+  // Discord Activity Embedded App SDK Auto-Login Effect
+  useEffect(() => {
+    initDiscordActivitySdk().then(activityUser => {
+      if (activityUser) {
+        setCurrentUser(activityUser);
+        setIsLoginModalOpen(false);
+        setMessages(prev => [...prev, {
+          id: 'sys_' + Date.now(),
+          type: 'system',
+          text: `🚀 ${activityUser.username} Discord Aktivitesi üzerinden salona katıldı!`
+        }]);
+      }
+    });
+  }, []);
 
   // Real-Time Multi-User Room Sync Polling (Every 2 seconds, GET also acts as presence heartbeat)
   useEffect(() => {

@@ -12,6 +12,7 @@
     "deploy": "npm run build && wrangler pages deploy ./dist --project-name=afksinema"
   },
   "dependencies": {
+    "@discord/embedded-app-sdk": "^2.5.0",
     "canvas-confetti": "^1.9.4",
     "lucide-react": "^1.27.0",
     "peerjs": "^1.5.5",

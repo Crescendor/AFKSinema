@@ -1,4 +1,5 @@
-// Discord OAuth2 & Admin Authorization Helper
+// Discord OAuth2 & Admin Authorization Helper + Embedded App SDK
+import { DiscordSDK } from '@discord/embedded-app-sdk';
 
 export const ADMIN_DISCORD_IDS = [
   '102225960337670144',
@@ -16,6 +17,42 @@ export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
   // Use registered /callback redirectUri for Discord OAuth App
   const redirectUri = window.location.origin + '/callback';
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
+};
+
+export let discordActivitySdk = null;
+
+export const isDiscordActivityEnvironment = () => {
+  if (typeof window === 'undefined') return false;
+  const searchParams = new URLSearchParams(window.location.search);
+  return searchParams.has('frame_id') || (window.location.ancestorOrigins && window.location.ancestorOrigins.length > 0);
+};
+
+export const initDiscordActivitySdk = async () => {
+  if (!isDiscordActivityEnvironment()) return null;
+
+  try {
+    discordActivitySdk = new DiscordSDK(DEFAULT_DISCORD_CLIENT_ID);
+    await discordActivitySdk.ready();
+
+    // Authorize within Discord Embedded App SDK
+    const { code } = await discordActivitySdk.commands.authorize({
+      client_id: DEFAULT_DISCORD_CLIENT_ID,
+      response_type: 'code',
+      state: '',
+      prompt: 'none',
+      scope: ['identify', 'guilds']
+    });
+
+    const userProfile = await exchangeCodeForUser(code);
+    if (userProfile) {
+      userProfile.isDiscordActivity = true;
+      userProfile.channelId = discordActivitySdk.channelId;
+    }
+    return userProfile;
+  } catch (err) {
+    console.warn('Discord Activity Embedded SDK auto-login error:', err);
+    return null;
+  }
 };
 
 // Exchange OAuth Code for Token via Cloudflare Edge API (/api/discord-token)
