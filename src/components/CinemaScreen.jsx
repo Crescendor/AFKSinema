@@ -1,7 +1,38 @@
 import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import Peer from 'peerjs';
-import { Maximize, Coffee, MessageSquare, X, Send, Trash2, Lightbulb, Play, Eye } from 'lucide-react';
+import { Maximize, Coffee, MessageSquare, X, Send, Trash2, Lightbulb, Play, Eye, Volume2, VolumeX } from 'lucide-react';
 import { isAdminUser } from '../utils/discordAuth';
+
+// ── WebRTC STUN Server Configuration for Reliable Cross-Network Connections ─────
+const PEER_CONFIG = {
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:stun3.l.google.com:19302' },
+      { urls: 'stun:stun4.l.google.com:19302' }
+    ]
+  }
+};
+
+// Creates a tiny silent dummy stream so viewer can initiate a peer call
+function createDummyStream() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const dst = ctx.createMediaStreamDestination();
+    osc.connect(dst);
+    osc.start();
+    return dst.stream;
+  } catch (e) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 1;
+    canvas.height = 1;
+    return canvas.captureStream(1);
+  }
+}
 
 // ── Converts a YouTube watch URL to an embed URL ──────────────────────────────
 function toEmbedUrl(raw) {
@@ -35,6 +66,10 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
   const [fsText, setFsText] = useState('');
   const [molaSeconds, setMolaSeconds] = useState(0);
 
+  // Viewer Audio Controls State
+  const [volume, setVolume] = useState(1.0);
+  const [isMuted, setIsMuted] = useState(false);
+
   const screenFrameRef = useRef(null);
   const chatScrollRef = useRef(null);
   const videoRef = useRef(null);
@@ -55,6 +90,14 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
     stopBroadcast: handleStopBroadcast
   }));
 
+  // Sync volume & mute to video element for viewers
+  useEffect(() => {
+    if (videoRef.current && !isHostRef.current) {
+      videoRef.current.volume = volume;
+      videoRef.current.muted = isMuted;
+    }
+  }, [volume, isMuted]);
+
   // ── WebRTC BROADCASTER (HOST) LOGIC ───────────────────────────────────────
   async function handleStartBroadcast() {
     if (!isAdmin) {
@@ -71,15 +114,16 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
       localStreamRef.current = mediaStream;
       isHostRef.current = true;
 
-      // Show local video stream immediately for host
+      // Show local video stream immediately for host (muted locally to avoid echo loop)
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream;
+        videoRef.current.muted = true;
         videoRef.current.play().catch(() => {});
       }
 
       // Initialize PeerJS Host
       const hostId = 'afksinema-host-' + Math.random().toString(36).substring(2, 8);
-      const peer = new Peer(hostId, { debug: 1 });
+      const peer = new Peer(hostId, PEER_CONFIG);
       hostPeerRef.current = peer;
 
       peer.on('open', (id) => {
@@ -172,24 +216,40 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
     }
 
     // Connect to host via PeerJS
-    const viewerPeer = new Peer({ debug: 1 });
+    const viewerPeer = new Peer(PEER_CONFIG);
     viewerPeerRef.current = viewerPeer;
 
+    const handleRemoteStream = (remoteStream) => {
+      if (videoRef.current) {
+        videoRef.current.srcObject = remoteStream;
+        videoRef.current.volume = volume;
+        videoRef.current.muted = isMuted;
+        videoRef.current.play().catch(() => {});
+      }
+    };
+
     viewerPeer.on('open', () => {
-      const conn = viewerPeer.connect(broadcasterPeerId);
-      conn.on('open', () => {
-        conn.send({ type: 'REQUEST_STREAM' });
-      });
+      // 1. Directly call host with dummy stream
+      try {
+        const dummy = createDummyStream();
+        const call = viewerPeer.call(broadcasterPeerId, dummy);
+        if (call) {
+          call.on('stream', handleRemoteStream);
+        }
+      } catch (e) {}
+
+      // 2. Also send data message as fallback
+      try {
+        const conn = viewerPeer.connect(broadcasterPeerId);
+        conn.on('open', () => {
+          conn.send({ type: 'REQUEST_STREAM' });
+        });
+      } catch (e) {}
     });
 
     viewerPeer.on('call', (call) => {
-      call.answer(); // Answer without sending local stream
-      call.on('stream', (remoteStream) => {
-        if (videoRef.current) {
-          videoRef.current.srcObject = remoteStream;
-          videoRef.current.play().catch(() => {});
-        }
-      });
+      call.answer(); // Answer incoming call from host
+      call.on('stream', handleRemoteStream);
     });
 
     return () => {
@@ -333,7 +393,7 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
                   ref={videoRef}
                   autoPlay
                   playsInline
-                  muted={isHostRef.current} // Host is muted to avoid loopback, viewers hear sound
+                  muted={isHostRef.current ? true : isMuted}
                   controls={false}
                   disablePictureInPicture
                   controlsList="nodownload no remoteplayback noplaybackrate"
@@ -350,13 +410,15 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
                     pointerEvents: 'auto'
                   }}
                 />
+
+                {/* Live Badge Overlay */}
                 <div style={{
                   position: 'absolute',
                   top: '12px',
                   left: '12px',
-                  background: 'rgba(0,0,0,0.7)',
+                  background: 'rgba(0,0,0,0.75)',
                   border: '1px solid #10b981',
-                  padding: '4px 10px',
+                  padding: '4px 12px',
                   borderRadius: '20px',
                   fontSize: '0.75rem',
                   fontWeight: 800,
@@ -472,7 +534,36 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          {/* Viewer Individual Audio Volume Control Bar */}
+          {!isHostRef.current && (broadcasterPeerId || isBroadcasting) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(0,0,0,0.6)', padding: '4px 10px', borderRadius: '20px', border: '1px solid rgba(255,255,255,0.12)' }}>
+              <button
+                onClick={() => setIsMuted(!isMuted)}
+                style={{ background: 'none', border: 'none', color: isMuted ? '#ef4444' : '#34d399', cursor: 'pointer', display: 'flex', alignItems: 'center', padding: '2px' }}
+                title={isMuted ? "Sesi Aç" : "Sesi Kapat"}
+              >
+                {isMuted || volume === 0 ? <VolumeX size={16} color="#ef4444" /> : <Volume2 size={16} color="#34d399" />}
+              </button>
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={isMuted ? 0 : volume}
+                onChange={(e) => {
+                  const v = parseFloat(e.target.value);
+                  setVolume(v);
+                  if (v > 0) setIsMuted(false);
+                }}
+                style={{ width: '80px', accentColor: 'var(--cinema-red)', cursor: 'pointer' }}
+              />
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontFamily: 'monospace', minWidth: '32px' }}>
+                {isMuted ? '0%' : `${Math.round(volume * 100)}%`}
+              </span>
+            </div>
+          )}
+
           {isAdmin && (
             <button
               className="btn-cinema"
