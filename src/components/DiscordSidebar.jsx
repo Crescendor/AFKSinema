@@ -16,6 +16,7 @@ export function DiscordSidebar({
   seatedUsers,
   currentUser,
   userBadges = {},
+  hiddenBadges = {},
   vipUsers = {},
   onTriggerReaction,
   onOpenAdminModal
@@ -29,10 +30,46 @@ export function DiscordSidebar({
   const [imageUrlInput, setImageUrlInput] = useState('');
 
   const chatEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Mention Autocomplete Matching
+  const atMatch = text.match(/(?:^|\s)@([A-Za-z0-9_ğüşıöçĞÜŞİÖÇ]*)$/);
+  const mentionQuery = atMatch ? atMatch[1].toLowerCase() : null;
+
+  const audienceList = Object.entries(seatedUsers).map(([seatCode, user]) => ({
+    seatCode,
+    user
+  }));
+
+  const mentionCandidates = mentionQuery !== null
+    ? audienceList.filter(({ user }) => user.username.toLowerCase().includes(mentionQuery))
+    : [];
+
+  const selectMentionUser = (username) => {
+    setText(prev => prev.replace(/(?:^|\s)@[A-Za-z0-9_ğüşıöçĞÜŞİÖÇ]*$/, ` @${username} `));
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const handleReplyClick = (msg) => {
+    setReplyingTo({ id: msg.id, username: msg.user?.username || 'Kullanıcı', text: msg.text || '' });
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
+  const scrollToMessage = (msgId) => {
+    const el = document.getElementById(`chat-msg-${msgId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.style.transition = 'background 0.3s ease';
+      el.style.background = 'rgba(251, 191, 36, 0.35)';
+      setTimeout(() => {
+        el.style.background = 'transparent';
+      }, 1500);
+    }
+  };
 
   const handleSendText = (e) => {
     e.preventDefault();
@@ -88,10 +125,12 @@ export function DiscordSidebar({
 
   const insertMention = (username) => {
     setText(prev => (prev ? `${prev} @${username} ` : `@${username} `));
+    setTimeout(() => inputRef.current?.focus(), 50);
   };
 
   const getUserBadge = (user) => {
     if (!user) return null;
+    if (hiddenBadges && hiddenBadges[user.id]) return null;
     if (userBadges && userBadges[user.id]) {
       return userBadges[user.id];
     }
@@ -160,17 +199,22 @@ export function DiscordSidebar({
   const renderMessageContent = (msg) => {
     return (
       <div className="chat-msg-text">
-        {/* Reply Quote Banner */}
+        {/* Clickable Reply Quote Banner */}
         {msg.replyTo && (
-          <div style={{
-            background: 'rgba(255,255,255,0.06)',
-            borderLeft: '3px solid var(--cinema-red)',
-            padding: '4px 8px',
-            borderRadius: '4px',
-            fontSize: '0.72rem',
-            marginBottom: '6px',
-            color: 'var(--text-muted)'
-          }}>
+          <div
+            onClick={() => scrollToMessage(msg.replyTo.id)}
+            style={{
+              background: 'rgba(255,255,255,0.06)',
+              borderLeft: '3px solid var(--cinema-red)',
+              padding: '4px 8px',
+              borderRadius: '4px',
+              fontSize: '0.72rem',
+              marginBottom: '6px',
+              color: 'var(--text-muted)',
+              cursor: 'pointer'
+            }}
+            title="Orijinal mesaja gitmek için tıkla"
+          >
             <span style={{ color: 'var(--cinema-red)', fontWeight: 800 }}>@{msg.replyTo.username}</span> yanıtlandı: {msg.replyTo.text?.slice(0, 45)}
           </div>
         )}
@@ -185,11 +229,6 @@ export function DiscordSidebar({
       </div>
     );
   };
-
-  const audienceList = Object.entries(seatedUsers).map(([seatCode, user]) => ({
-    seatCode,
-    user
-  }));
 
   const isAdmin = isAdminUser(currentUser);
 
@@ -223,7 +262,7 @@ export function DiscordSidebar({
       {/* TAB CONTENT: Chat Feed */}
       {activeTab === 'chat' && (
         <>
-          <div className="chat-feed" style={{ position: 'relative' }}>
+          <div className="chat-feed" style={{ position: 'relative', overflowY: 'auto' }}>
             {messages.map((msg) => {
               if (msg.type === 'system') {
                 return (
@@ -237,7 +276,7 @@ export function DiscordSidebar({
               const badge = getUserBadge(msg.user);
 
               return (
-                <div key={msg.id} className="chat-msg" style={{ position: 'relative' }}>
+                <div id={`chat-msg-${msg.id}`} key={msg.id} className="chat-msg" style={{ position: 'relative', borderRadius: '6px', padding: '4px 6px', transition: 'background 0.3s' }}>
                   <img src={msg.user?.avatar} alt={msg.user?.username} className="chat-msg-avatar" />
                   <div className="chat-msg-content" style={{ flex: 1 }}>
                     <div className="chat-msg-user" style={{ justifyContent: 'space-between', width: '100%' }}>
@@ -275,7 +314,7 @@ export function DiscordSidebar({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         {/* Reply Button */}
                         <button
-                          onClick={() => setReplyingTo({ id: msg.id, username: msg.user?.username || 'Kullanıcı', text: msg.text || '' })}
+                          onClick={() => handleReplyClick(msg)}
                           style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px 4px' }}
                           title="Mesaja Yanıt Ver"
                         >
@@ -327,6 +366,42 @@ export function DiscordSidebar({
               <button onClick={() => setReplyingTo(null)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>
                 <X size={14} />
               </button>
+            </div>
+          )}
+
+          {/* Mention Autocomplete Popup */}
+          {mentionCandidates.length > 0 && (
+            <div style={{
+              background: '#190a0f',
+              borderTop: '1px solid var(--cinema-red)',
+              borderBottom: '1px solid rgba(255,255,255,0.1)',
+              padding: '6px',
+              maxHeight: '140px',
+              overflowY: 'auto'
+            }}>
+              <div style={{ fontSize: '0.68rem', color: 'var(--accent-gold)', padding: '2px 6px', fontWeight: 800 }}>
+                Etiketlemek İçin Kullanıcı Seçin:
+              </div>
+              {mentionCandidates.map(({ seatCode, user }) => (
+                <div
+                  key={user.id}
+                  onClick={() => selectMentionUser(user.username)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '5px 8px',
+                    borderRadius: '6px',
+                    cursor: 'pointer',
+                    background: 'rgba(255,255,255,0.04)',
+                    marginBottom: '3px'
+                  }}
+                >
+                  <img src={user.avatar} alt={user.username} style={{ width: '20px', height: '20px', borderRadius: '50%' }} />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'white' }}>{user.username}</span>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--cinema-red)' }}>[{seatCode}]</span>
+                </div>
+              ))}
             </div>
           )}
 
@@ -409,6 +484,7 @@ export function DiscordSidebar({
 
           <form className="chat-input-bar" onSubmit={handleSendText}>
             <input
+              ref={inputRef}
               type="text"
               className="chat-input"
               placeholder={currentUser ? `${currentUser.username} olarak mesaj yaz...` : 'Sohbet et...'}

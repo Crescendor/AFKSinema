@@ -122,6 +122,8 @@ body {
 .cinema-app-body {
   display: flex;
   flex: 1;
+  height: calc(100vh - 64px - 45px);
+  max-height: calc(100vh - 64px - 45px);
   position: relative;
   overflow: hidden;
 }

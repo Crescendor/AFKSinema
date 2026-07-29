@@ -103,18 +103,15 @@ function BufeStandSide({ onOpenBuffet }) {
       onClick={onOpenBuffet}
       style={{
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '16px 10px',
+        padding: '12px 6px',
         cursor: 'pointer',
         zIndex: 42,
         userSelect: 'none',
-        transition: 'transform 0.2s ease',
-        background: 'rgba(12, 5, 9, 0.6)',
-        borderRight: '1px solid rgba(255,255,255,0.06)'
+        transition: 'transform 0.25s ease'
       }}
-      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.04)'}
+      onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.06)'}
       onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
       title="🍿 AFK Sinema Büfesi - Tıkla Sipariş Ver"
     >
@@ -122,27 +119,12 @@ function BufeStandSide({ onOpenBuffet }) {
         src="/the_bufeh.png"
         alt="AFK Sinema The Büfeh"
         style={{
-          width: '135px',
+          width: '185px',
           height: 'auto',
           objectFit: 'contain',
-          filter: 'drop-shadow(0 0 15px rgba(225, 29, 72, 0.8)) drop-shadow(0 0 25px rgba(251, 191, 36, 0.5))'
+          filter: 'drop-shadow(0 0 20px rgba(225, 29, 72, 0.85)) drop-shadow(0 0 35px rgba(251, 191, 36, 0.6))'
         }}
       />
-      <div style={{
-        marginTop: '10px',
-        background: 'linear-gradient(135deg, var(--cinema-red), #b45309)',
-        color: 'white',
-        padding: '5px 12px',
-        borderRadius: '16px',
-        fontSize: '0.74rem',
-        fontWeight: 800,
-        boxShadow: '0 0 14px rgba(225,29,72,0.6)',
-        border: '1px solid rgba(255,255,255,0.2)',
-        textAlign: 'center',
-        whiteSpace: 'nowrap'
-      }}>
-        🍿 Büfe Siparişi Ver
-      </div>
     </div>
   );
 }
@@ -186,6 +168,14 @@ export default function App() {
   const [userBadges, setUserBadges] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_user_badges');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) { return {}; }
+  });
+
+  // Hidden User Badges State (User privacy toggle)
+  const [hiddenBadges, setHiddenBadges] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_hidden_badges');
       return saved ? JSON.parse(saved) : {};
     } catch (e) { return {}; }
   });
@@ -287,6 +277,12 @@ export default function App() {
           const room = await res.json();
 
           // Sync & Deduplicate Seated Users in Real-Time across all clients
+          if (room.userBadges && typeof room.userBadges === 'object') {
+            setUserBadges(prev => JSON.stringify(prev) !== JSON.stringify(room.userBadges) ? room.userBadges : prev);
+          }
+          if (room.hiddenBadges && typeof room.hiddenBadges === 'object') {
+            setHiddenBadges(prev => JSON.stringify(prev) !== JSON.stringify(room.hiddenBadges) ? room.hiddenBadges : prev);
+          }
           if (room.seatedUsers && typeof room.seatedUsers === 'object') {
             const sanitized = sanitizeSeatedUsers(room.seatedUsers);
             setSeatedUsers(prev => {
@@ -414,6 +410,10 @@ export default function App() {
     localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters));
   }, [moviePosters]);
 
+  useEffect(() => {
+    localStorage.setItem('afk_hidden_badges', JSON.stringify(hiddenBadges));
+  }, [hiddenBadges]);
+
 
   // Dynamic Seance Credit Loop: Awarded based on Admin-configured minute interval & credit amounts ONLY when seance is ACTIVE AND user is SEATED!
   useEffect(() => {
@@ -538,24 +538,6 @@ export default function App() {
 
     const actualSeatCode = findNearestFreeSeat(seatCode, seatedUsers, currentUser.id);
 
-    if (!isAdmin) {
-      const userId = currentUser.id;
-      const now = Date.now();
-      const userLimit = seatChangeLimits[userId] || { count: 0, resetTime: now + (10 * 60 * 1000) };
-
-      if (now > userLimit.resetTime) {
-        seatChangeLimits[userId] = { count: 1, resetTime: now + (10 * 60 * 1000) };
-      } else {
-        if (userLimit.count >= 10) {
-          const remainingMinutes = Math.ceil((userLimit.resetTime - now) / (60 * 1000));
-          alert(`⏱️ KOLTUK DEĞİŞTİRME LİMİTİ:\nÇok fazla koltuk değiştirdiniz! 10 dakikada en fazla 10 kez koltuk değiştirebilirsiniz.\nYenilenmesine kalan süre: ${remainingMinutes} dakika.`);
-          return;
-        }
-        seatChangeLimits[userId] = { count: userLimit.count + 1, resetTime: userLimit.resetTime };
-      }
-      setSeatChangeLimits({ ...seatChangeLimits });
-    }
-
     const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
       if (u.id !== currentUser.id) updated[code] = u;
@@ -650,6 +632,18 @@ export default function App() {
       type: 'system',
       text: `✏️ ${currentUser.username} ismini "${newNickname}" olarak değiştirdi.`
     }]);
+  };
+
+  const handleToggleHideBadge = (badgeKey) => {
+    setHiddenBadges(prev => {
+      const updated = { ...prev, [badgeKey]: !prev[badgeKey] };
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_STATE', data: { hiddenBadges: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleLogout = () => {
@@ -1183,6 +1177,7 @@ export default function App() {
           seatedUsers={seatedUsers}
           currentUser={currentUser}
           userBadges={userBadges}
+          hiddenBadges={hiddenBadges}
           vipUsers={vipUsers}
           onTriggerReaction={handleTriggerReaction}
           onOpenAdminModal={openAdminModal}
@@ -1215,6 +1210,7 @@ export default function App() {
         currentUser={currentUser}
       />
 
+      {/* User Profile Settings Modal */}
       <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1222,6 +1218,8 @@ export default function App() {
         onUpdateNickname={handleUpdateNickname}
         onLogout={handleLogout}
         isAdmin={isAdmin}
+        hiddenBadges={hiddenBadges}
+        onToggleHideBadge={handleToggleHideBadge}
       />
 
       <CinemaBuffetModal

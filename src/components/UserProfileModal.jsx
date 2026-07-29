@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, LogOut, Check, X, Edit3, Shield } from 'lucide-react';
+import { User, LogOut, Check, X, EyeOff } from 'lucide-react';
 
 export function UserProfileModal({
   isOpen,
@@ -7,7 +7,9 @@ export function UserProfileModal({
   currentUser,
   onUpdateNickname,
   onLogout,
-  isAdmin
+  isAdmin,
+  hiddenBadges = {},
+  onToggleHideBadge
 }) {
   const [nickname, setNickname] = useState(currentUser?.username || '');
 
@@ -19,6 +21,8 @@ export function UserProfileModal({
     onUpdateNickname(nickname.trim());
     onClose();
   };
+
+  const isBadgeHidden = !!hiddenBadges[currentUser.id];
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
@@ -64,7 +68,7 @@ export function UserProfileModal({
         </div>
 
         {/* Edit Nickname Form */}
-        <form onSubmit={handleSave} style={{ marginBottom: '20px' }}>
+        <form onSubmit={handleSave} style={{ marginBottom: '16px' }}>
           <label style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
             Sinema İsmini Değiştir:
           </label>
@@ -91,6 +95,26 @@ export function UserProfileModal({
             </button>
           </div>
         </form>
+
+        {/* Badge Privacy Toggle Option */}
+        <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '12px', padding: '12px', marginBottom: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'white', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <EyeOff size={15} color="var(--accent-gold)" /> Rozetimi Sohbette Gizle
+              </div>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                Aktifleştirirseniz rozetiniz sohbet ve listede saklanır.
+              </div>
+            </div>
+            <input
+              type="checkbox"
+              checked={isBadgeHidden}
+              onChange={() => onToggleHideBadge && onToggleHideBadge(currentUser.id)}
+              style={{ width: '18px', height: '18px', accentColor: 'var(--cinema-red)', cursor: 'pointer' }}
+            />
+          </div>
+        </div>
 
         {/* Logout Button */}
         <button
