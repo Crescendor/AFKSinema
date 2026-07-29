@@ -3,10 +3,11 @@
   "name": "afksinema",
   "pages_build_output_dir": "./dist",
   "compatibility_date": "2024-09-23",
-  "kv_namespaces": [
+  "d1_databases": [
     {
-      "binding": "ROOM_KV",
-      "id": "PLACEHOLDER_REPLACE_WITH_YOUR_KV_ID"
+      "binding": "ROOM_DB",
+      "database_name": "afksinema-room",
+      "database_id": "PLACEHOLDER_REPLACE_WITH_YOUR_D1_ID"
     }
   ]
 }

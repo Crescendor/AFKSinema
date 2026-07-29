@@ -172,11 +172,22 @@ export default function App() {
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   useEffect(() => { seatedUsersRef.current = seatedUsers; }, [seatedUsers]);
 
-  // Real-Time Multi-User Room Sync Polling (Every 1.2 seconds sync with Cloudflare Edge)
+  // Real-Time Multi-User Room Sync Polling (Every 2 seconds, GET also acts as presence heartbeat)
   useEffect(() => {
     const syncRoom = async () => {
       try {
-        const res = await fetch('/api/room');
+        // Build presence query params so GET doubles as heartbeat (no extra write needed)
+        const user = currentUserRef.current;
+        const seated = seatedUsersRef.current;
+        const mySeat = user ? Object.keys(seated).find(k => seated[k] && seated[k].id === user.id) : null;
+
+        const params = new URLSearchParams();
+        if (user && mySeat) {
+          params.set('uid', user.id);
+          params.set('seat', mySeat);
+        }
+
+        const res = await fetch(`/api/room?${params.toString()}`);
         if (res.ok) {
           const room = await res.json();
 
@@ -240,54 +251,25 @@ export default function App() {
     };
 
     syncRoom();
-    const interval = setInterval(syncRoom, 1000);
+    const interval = setInterval(syncRoom, 2000);
     return () => clearInterval(interval);
   }, []);
 
-  // Heartbeat Polling & Automatic Tab Close Cleanup
-  // Uses refs so we always have the latest user/seat without stale closures
+  // Tab Close: notify server when user leaves (sendBeacon is fire-and-forget)
   useEffect(() => {
-    const sendHeartbeat = () => {
-      const user = currentUserRef.current;
-      if (!user) return;
-      const seated = seatedUsersRef.current;
-      const mySeat = Object.keys(seated).find(k => seated[k] && seated[k].id === user.id);
-
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'HEARTBEAT',
-          data: { userId: user.id, seatCode: mySeat || null, user }
-        })
-      }).catch(() => {});
-    };
-
-    sendHeartbeat();
-    const heartbeatInterval = setInterval(sendHeartbeat, 2500);
-
-    // Immediately remove user when they close the browser or tab
     const handleLeave = () => {
       const user = currentUserRef.current;
       if (!user) return;
-      const payload = JSON.stringify({
-        action: 'LEAVE_ROOM',
-        data: { userId: user.id }
-      });
-      if (navigator.sendBeacon) {
-        navigator.sendBeacon('/api/room', payload);
-      }
+      const payload = JSON.stringify({ action: 'LEAVE_ROOM', data: { userId: user.id } });
+      if (navigator.sendBeacon) navigator.sendBeacon('/api/room', payload);
     };
-
     window.addEventListener('beforeunload', handleLeave);
     window.addEventListener('pagehide', handleLeave);
-
     return () => {
-      clearInterval(heartbeatInterval);
       window.removeEventListener('beforeunload', handleLeave);
       window.removeEventListener('pagehide', handleLeave);
     };
-  }, []); // Mount once — refs handle latest values
+  }, []);
 
   useEffect(() => {
     if (currentUser) {

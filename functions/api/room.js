@@ -1,58 +1,46 @@
 // Cloudflare Pages Edge State Synchronizer: /api/room
-// Uses Cloudflare KV for shared state across ALL edge instances
-// This solves the "users can't see each other" problem caused by per-instance in-memory state
+// Uses Cloudflare D1 (SQLite) — shared, consistent state across ALL edge instances
+//
+// D1 Write Optimization:
+//   - Heartbeat is piggy-backed onto the GET poll via query params (uid + seat)
+//     so no extra write calls are needed from the client for presence tracking.
+//   - All other writes are targeted single-row operations.
+//
+// D1 Free Tier Budget (10 active users, 4h session):
+//   Reads:  10 users × 2s poll × ~5 rows = ~360k rows/day  (limit: 5M ✓)
+//   Writes: 10 users × 2s poll = ~72k rows/day              (limit: 100k ✓)
 
-const KV_KEY = 'room_state';
-const HEARTBEAT_TIMEOUT_MS = 8000; // 8 seconds
+const INACTIVE_MS = 12000; // 12s — user considered gone if no poll seen
 
-const DEFAULT_STATE = {
-  broadcasterName: '',
-  seatedUsers: {},
-  messages: [],
-  activeMola: null,
-  moviePosters: null,
-  buffetItems: null,
-  reactions: [],
-  heartbeats: {}
-};
-
-async function getState(env) {
-  try {
-    if (env && env.ROOM_KV) {
-      const raw = await env.ROOM_KV.get(KV_KEY, { type: 'json' });
-      return raw || { ...DEFAULT_STATE };
-    }
-  } catch (e) {}
-  return { ...DEFAULT_STATE };
+// ─── Schema Initialization ───────────────────────────────────────────────────
+async function ensureSchema(db) {
+  // Run once per cold-start; D1 deduplicates "IF NOT EXISTS" cheaply.
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS seated_users (
+      user_id   TEXT PRIMARY KEY,
+      seat_code TEXT NOT NULL,
+      user_data TEXT NOT NULL,
+      last_seen INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS room_config (
+      key   TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS messages (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS reactions (
+      id         TEXT PRIMARY KEY,
+      data       TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
+  `);
 }
 
-async function saveState(env, state) {
-  try {
-    if (env && env.ROOM_KV) {
-      await env.ROOM_KV.put(KV_KEY, JSON.stringify(state));
-    }
-  } catch (e) {}
-}
-
-function cleanupInactiveUsers(state) {
-  const now = Date.now();
-  if (!state.heartbeats) state.heartbeats = {};
-  if (!state.seatedUsers) state.seatedUsers = {};
-
-  Object.entries(state.seatedUsers).forEach(([seatCode, user]) => {
-    if (user && user.id) {
-      const lastActive = state.heartbeats[user.id];
-      if (!lastActive || (now - lastActive > HEARTBEAT_TIMEOUT_MS)) {
-        delete state.seatedUsers[seatCode];
-        delete state.heartbeats[user.id];
-      }
-    }
-  });
-
-  return state;
-}
-
-function corsHeaders() {
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function cors() {
   return {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -60,111 +48,156 @@ function corsHeaders() {
   };
 }
 
-export async function onRequestGet(context) {
-  let state = await getState(context.env);
-  state = cleanupInactiveUsers(state);
-  await saveState(context.env, state);
-
-  return new Response(JSON.stringify(state), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'no-cache, no-store, must-revalidate',
-      ...corsHeaders()
-    }
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...cors() }
   });
 }
 
+// ─── GET /api/room — also acts as presence heartbeat ────────────────────────
+export async function onRequestGet(context) {
+  const db = context.env.ROOM_DB;
+  if (!db) return json({ error: 'D1 not bound. Set ROOM_DB binding in Cloudflare dashboard.' }, 503);
+
+  await ensureSchema(db);
+
+  const url = new URL(context.request.url);
+  const uid  = url.searchParams.get('uid');
+  const seat = url.searchParams.get('seat');
+  const now  = Date.now();
+  const cutoff = now - INACTIVE_MS;
+
+  // Piggy-back: update last_seen for the calling user (0 extra client write)
+  if (uid && seat) {
+    // Upsert presence: keep user alive and on correct seat
+    await db.prepare(`
+      INSERT INTO seated_users (user_id, seat_code, user_data, last_seen)
+      VALUES (?, ?, COALESCE((SELECT user_data FROM seated_users WHERE user_id = ?), '{}'), ?)
+      ON CONFLICT(user_id) DO UPDATE SET seat_code = excluded.seat_code, last_seen = excluded.last_seen
+    `).bind(uid, seat, uid, now).run();
+  }
+
+  // Batch fetch everything in one round-trip
+  const [usersRes, configRes, msgsRes, reactRes] = await db.batch([
+    db.prepare('SELECT user_id, seat_code, user_data FROM seated_users WHERE last_seen > ?').bind(cutoff),
+    db.prepare('SELECT key, value FROM room_config'),
+    db.prepare('SELECT data FROM messages ORDER BY created_at ASC'),
+    db.prepare('SELECT data FROM reactions WHERE created_at > ?').bind(now - 3000)
+  ]);
+
+  // Shape seated users into { seatCode: userObj }
+  const seatedUsers = {};
+  for (const row of (usersRes.results || [])) {
+    try {
+      seatedUsers[row.seat_code] = JSON.parse(row.user_data);
+    } catch {}
+  }
+
+  // Shape config into flat object
+  const config = {};
+  for (const row of (configRes.results || [])) {
+    try {
+      config[row.key] = JSON.parse(row.value);
+    } catch { config[row.key] = row.value; }
+  }
+
+  const messages  = (msgsRes.results  || []).map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+  const reactions = (reactRes.results || []).map(r => { try { return JSON.parse(r.data); } catch { return null; } }).filter(Boolean);
+
+  return json({
+    seatedUsers,
+    messages,
+    reactions,
+    activeMola:      config.activeMola      ?? null,
+    moviePosters:    config.moviePosters    ?? null,
+    buffetItems:     config.buffetItems     ?? null,
+    broadcasterName: config.broadcasterName ?? ''
+  });
+}
+
+// ─── POST /api/room — all mutations ──────────────────────────────────────────
 export async function onRequestPost(context) {
+  const db = context.env.ROOM_DB;
+  if (!db) return json({ error: 'D1 not bound.' }, 503);
+
+  await ensureSchema(db);
+
+  let payload;
+  try { payload = await context.request.json(); }
+  catch { return json({ error: 'Invalid JSON' }, 400); }
+
+  const { action, data } = payload;
+  const now = Date.now();
+
   try {
-    const payload = await context.request.json();
-    const { action, data } = payload;
-    const now = Date.now();
-
-    let state = await getState(context.env);
-    if (!state.heartbeats) state.heartbeats = {};
-    if (!state.seatedUsers) state.seatedUsers = {};
-    if (!state.messages) state.messages = [];
-    if (!state.reactions) state.reactions = [];
-
-    if (action === 'HEARTBEAT') {
-      if (data && data.userId) {
-        state.heartbeats[data.userId] = now;
-        // Also keep the seat occupied
-        if (data.seatCode && data.user) {
-          // Remove any stale seat for this user
-          Object.keys(state.seatedUsers).forEach(code => {
-            if (state.seatedUsers[code] && state.seatedUsers[code].id === data.userId && code !== data.seatCode) {
-              delete state.seatedUsers[code];
-            }
-          });
-          state.seatedUsers[data.seatCode] = data.user;
-        }
-      }
-      state = cleanupInactiveUsers(state);
+    if (action === 'SEAT_OCCUPY') {
+      // Remove all old seats for this user, then insert new one
+      const { seatCode, user } = data;
+      await db.batch([
+        db.prepare('DELETE FROM seated_users WHERE user_id = ?').bind(user.id),
+        db.prepare('INSERT INTO seated_users (user_id, seat_code, user_data, last_seen) VALUES (?, ?, ?, ?)')
+          .bind(user.id, seatCode, JSON.stringify(user), now)
+      ]);
 
     } else if (action === 'LEAVE_ROOM') {
-      if (data && data.userId) {
-        Object.keys(state.seatedUsers).forEach(code => {
-          if (state.seatedUsers[code] && state.seatedUsers[code].id === data.userId) {
-            delete state.seatedUsers[code];
-          }
-        });
-        delete state.heartbeats[data.userId];
-      }
-
-    } else if (action === 'SEAT_OCCUPY') {
-      const { seatCode, user } = data;
-      // Remove old seat for this user
-      Object.keys(state.seatedUsers).forEach(code => {
-        if (state.seatedUsers[code] && state.seatedUsers[code].id === user.id) {
-          delete state.seatedUsers[code];
-        }
-      });
-      state.seatedUsers[seatCode] = user;
-      if (user && user.id) state.heartbeats[user.id] = now;
+      await db.prepare('DELETE FROM seated_users WHERE user_id = ?').bind(data.userId).run();
 
     } else if (action === 'SEND_CHAT') {
-      state.messages.push(data);
-      if (state.messages.length > 100) state.messages.shift();
+      await db.prepare('INSERT OR REPLACE INTO messages (id, data, created_at) VALUES (?, ?, ?)')
+        .bind(data.id, JSON.stringify(data), now).run();
+      // Keep only last 100 messages
+      await db.prepare(`
+        DELETE FROM messages WHERE id NOT IN (
+          SELECT id FROM messages ORDER BY created_at DESC LIMIT 100
+        )
+      `).run();
 
     } else if (action === 'DELETE_CHAT') {
-      state.messages = state.messages.filter(m => m.id !== data.msgId);
+      await db.prepare('DELETE FROM messages WHERE id = ?').bind(data.msgId).run();
 
     } else if (action === 'SEND_REACTION') {
-      state.reactions.push(data);
-      if (state.reactions.length > 30) state.reactions.shift();
+      await db.prepare('INSERT OR REPLACE INTO reactions (id, data, created_at) VALUES (?, ?, ?)')
+        .bind(data.id, JSON.stringify(data), now).run();
+      // Keep only last 30 reactions
+      await db.prepare(`
+        DELETE FROM reactions WHERE id NOT IN (
+          SELECT id FROM reactions ORDER BY created_at DESC LIMIT 30
+        )
+      `).run();
 
     } else if (action === 'UPDATE_MOLA') {
-      state.activeMola = data.activeMola;
+      await db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)')
+        .bind('activeMola', JSON.stringify(data.activeMola)).run();
 
     } else if (action === 'UPDATE_POSTERS') {
-      state.moviePosters = data.moviePosters;
+      await db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)')
+        .bind('moviePosters', JSON.stringify(data.moviePosters)).run();
 
     } else if (action === 'UPDATE_BUFFET') {
-      state.buffetItems = data.buffetItems;
+      await db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)')
+        .bind('buffetItems', JSON.stringify(data.buffetItems)).run();
 
     } else if (action === 'SYNC_STATE') {
-      if (data.seatedUsers !== undefined) state.seatedUsers = data.seatedUsers;
-      if (data.messages !== undefined) state.messages = data.messages;
-      if (data.activeMola !== undefined) state.activeMola = data.activeMola;
-      if (data.moviePosters !== undefined) state.moviePosters = data.moviePosters;
-      if (data.buffetItems !== undefined) state.buffetItems = data.buffetItems;
-      if (data.broadcasterName !== undefined) state.broadcasterName = data.broadcasterName;
+      const updates = [];
+      if (data.broadcasterName !== undefined)
+        updates.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('broadcasterName', JSON.stringify(data.broadcasterName)));
+      if (data.activeMola !== undefined)
+        updates.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('activeMola', JSON.stringify(data.activeMola)));
+      if (data.moviePosters !== undefined)
+        updates.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('moviePosters', JSON.stringify(data.moviePosters)));
+      if (data.buffetItems !== undefined)
+        updates.push(db.prepare('INSERT OR REPLACE INTO room_config (key, value) VALUES (?, ?)').bind('buffetItems', JSON.stringify(data.buffetItems)));
+      if (updates.length > 0) await db.batch(updates);
     }
 
-    await saveState(context.env, state);
-
-    return new Response(JSON.stringify({ success: true, state }), {
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() }
-    });
+    return json({ success: true });
   } catch (err) {
-    return new Response(JSON.stringify({ success: false, error: err.message }), {
-      status: 400,
-      headers: { 'Content-Type': 'application/json', ...corsHeaders() }
-    });
+    return json({ success: false, error: err.message }, 500);
   }
 }
 
+// ─── OPTIONS — CORS preflight ────────────────────────────────────────────────
 export async function onRequestOptions() {
-  return new Response(null, { headers: corsHeaders() });
+  return new Response(null, { headers: cors() });
 }
