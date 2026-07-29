@@ -174,6 +174,8 @@ export default function App() {
 
   // Real-Time Multi-User Room Sync Polling (Every 2 seconds, GET also acts as presence heartbeat)
   useEffect(() => {
+    let seeded = false; // Seed D1 defaults once per session if it has no data yet
+
     const syncRoom = async () => {
       try {
         // Build presence query params so GET doubles as heartbeat (no extra write needed)
@@ -239,6 +241,15 @@ export default function App() {
             setBuffetItems(prev => {
               return JSON.stringify(room.buffetItems) !== JSON.stringify(prev) ? room.buffetItems : prev;
             });
+          } else if (!seeded) {
+            // D1 has no buffetItems yet — seed it with the local defaults so all users see the same list
+            seeded = true;
+            const localItems = JSON.parse(localStorage.getItem('afk_buffet_items') || 'null') || INITIAL_BUFFET_ITEMS;
+            fetch('/api/room', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: localItems } })
+            }).catch(() => {});
           }
 
           if (room.broadcasterName !== undefined) {
@@ -254,6 +265,7 @@ export default function App() {
     const interval = setInterval(syncRoom, 2000);
     return () => clearInterval(interval);
   }, []);
+
 
   // Tab Close: notify server when user leaves (sendBeacon is fire-and-forget)
   useEffect(() => {
