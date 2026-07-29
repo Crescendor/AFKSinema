@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { User, LogOut, Check, X, EyeOff } from 'lucide-react';
+import { User, LogOut, Check, X, EyeOff, Coins } from 'lucide-react';
 
 export function UserProfileModal({
   isOpen,
@@ -9,7 +9,8 @@ export function UserProfileModal({
   onLogout,
   isAdmin,
   hiddenBadges = {},
-  onToggleHideBadge
+  onToggleHideBadge,
+  userCredits = {}
 }) {
   const [nickname, setNickname] = useState(currentUser?.username || '');
 
@@ -63,6 +64,22 @@ export function UserProfileModal({
             </div>
             <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
               {currentUser.role || 'Sinema İzleyicisi'}
+            </div>
+
+            <div style={{
+              marginTop: '8px',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(251, 191, 36, 0.15)',
+              border: '1px solid var(--accent-gold)',
+              color: 'var(--accent-gold)',
+              padding: '4px 12px',
+              borderRadius: '20px',
+              fontSize: '0.82rem',
+              fontWeight: 800
+            }}>
+              <Coins size={15} /> Bakiyeniz: {isAdmin ? 'Sınırsız (∞)' : `${userCredits[currentUser.id] ?? 50} 🪙 Kredi`}
             </div>
           </div>
         </div>

@@ -109,8 +109,16 @@ export const CinemaScreen = forwardRef(function CinemaScreen({
 
     try {
       const mediaStream = await navigator.mediaDevices.getDisplayMedia({
-        video: { cursor: 'always', width: { ideal: 1920 }, height: { ideal: 1080 } },
-        audio: true
+        video: {
+          cursor: 'always',
+          displaySurface: 'monitor',
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        },
+        audio: { suppressLocalAudioPlayback: true },
+        selfBrowserSurface: 'include',
+        surfaceSwitching: 'exclude',
+        preferCurrentTab: false
       });
 
       localStreamRef.current = mediaStream;

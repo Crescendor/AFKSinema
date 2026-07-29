@@ -283,6 +283,9 @@ export default function App() {
           if (room.hiddenBadges && typeof room.hiddenBadges === 'object') {
             setHiddenBadges(prev => JSON.stringify(prev) !== JSON.stringify(room.hiddenBadges) ? room.hiddenBadges : prev);
           }
+          if (room.userCredits && typeof room.userCredits === 'object') {
+            setUserCredits(prev => JSON.stringify(prev) !== JSON.stringify(room.userCredits) ? room.userCredits : prev);
+          }
           if (room.seatedUsers && typeof room.seatedUsers === 'object') {
             const sanitized = sanitizeSeatedUsers(room.seatedUsers);
             setSeatedUsers(prev => {
@@ -413,6 +416,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('afk_hidden_badges', JSON.stringify(hiddenBadges));
   }, [hiddenBadges]);
+
+  useEffect(() => {
+    localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
+  }, [userCredits]);
 
 
   // Dynamic Seance Credit Loop: Awarded based on Admin-configured minute interval & credit amounts ONLY when seance is ACTIVE AND user is SEATED!
@@ -810,10 +817,29 @@ export default function App() {
   };
 
   const handleGrantCredits = (userId, amount) => {
-    setUserCredits(prev => ({
-      ...prev,
-      [userId]: (prev[userId] || 50) + amount
-    }));
+    let newTotal = 50;
+    setUserCredits(prev => {
+      newTotal = (prev[userId] || 50) + amount;
+      const updated = { ...prev, [userId]: newTotal };
+      localStorage.setItem('afk_user_credits', JSON.stringify(updated));
+
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'SYNC_STATE', data: { userCredits: updated } })
+      }).catch(() => {});
+
+      return updated;
+    });
+
+    const targetUserObj = Object.values(seatedUsers).find(u => u && u.id === userId);
+    const targetName = targetUserObj ? targetUserObj.username : 'Kullanıcı';
+
+    setMessages(prev => [...prev, {
+      id: 'sys_' + Date.now(),
+      type: 'system',
+      text: `🎉 ${targetName} hesabına +${amount} 🪙 Kredi yüklendi! (Güncel Bakiye: ${newTotal} 🪙)`
+    }]);
   };
 
   const handleAddBuffetItem = (item) => {
@@ -1220,6 +1246,7 @@ export default function App() {
         isAdmin={isAdmin}
         hiddenBadges={hiddenBadges}
         onToggleHideBadge={handleToggleHideBadge}
+        userCredits={userCredits}
       />
 
       <CinemaBuffetModal
