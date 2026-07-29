@@ -178,6 +178,20 @@ export default function App() {
             });
           }
 
+          // Sync Floating Reactions (Without playing audio for remote users!)
+          if (Array.isArray(room.reactions)) {
+            const now = Date.now();
+            const validReactions = room.reactions.filter(r => (now - r.timestamp) < 2500);
+            setActiveReactions(prev => {
+              const existingIds = new Set(prev.map(p => p.id));
+              const newItems = validReactions.filter(r => !existingIds.has(r.id));
+              if (newItems.length > 0) {
+                return [...prev, ...newItems];
+              }
+              return prev;
+            });
+          }
+
           // Sync Active Mola
           if (room.activeMola !== undefined) {
             setActiveMola(room.activeMola);
@@ -459,7 +473,6 @@ export default function App() {
     setIsLoginModalOpen(true);
   };
 
-  // Buy Snack with 20 Bites Rule & 20 Min Expiry
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
       setUserCredits(prev => ({
@@ -469,7 +482,7 @@ export default function App() {
     }
 
     const expireTime = Date.now() + SNACK_EXPIRY_MS;
-    const initialBites = 20; // 20 bites per purchased snack
+    const initialBites = 20;
 
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
@@ -492,7 +505,6 @@ export default function App() {
     }]);
   };
 
-  // Consume Popcorn (Decrement bitesLeft by 1, clear if <= 0)
   const handleConsumePopcorn = () => {
     if (!currentUser) return;
     const userId = currentUser.id;
@@ -696,15 +708,17 @@ export default function App() {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
+  // Real-Time Floating Reactions (Broadcast to all users without audio for remote viewers)
   const handleTriggerReaction = (emoji) => {
     let seatX = 50;
+    let mySeatCode = null;
+
     if (currentUser) {
-      let mySeat = null;
       Object.entries(seatedUsers).forEach(([code, u]) => {
-        if (u.id === currentUser.id) mySeat = code;
+        if (u.id === currentUser.id) mySeatCode = code;
       });
-      if (mySeat) {
-        const colIndex = parseInt(mySeat.substring(1)) || 5;
+      if (mySeatCode) {
+        const colIndex = parseInt(mySeatCode.substring(1)) || 5;
         seatX = 15 + (colIndex * 7);
       }
     }
@@ -713,14 +727,23 @@ export default function App() {
       id: 'react_' + Date.now() + '_' + Math.random(),
       emoji,
       x: seatX + (Math.random() * 8 - 4),
-      y: 15 + (Math.random() * 10)
+      y: 15 + (Math.random() * 10),
+      timestamp: Date.now()
     };
 
+    // Render locally
     setActiveReactions(prev => [...prev, newReaction]);
+
+    // Broadcast to Cloudflare Edge room for other users
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'SEND_REACTION', data: newReaction })
+    }).catch(() => {});
 
     setTimeout(() => {
       setActiveReactions(prev => prev.filter(r => r.id !== newReaction.id));
-    }, 2200);
+    }, 2500);
   };
 
   const openAdminModal = (user, seatCode) => {

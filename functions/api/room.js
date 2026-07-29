@@ -5,10 +5,10 @@ let roomState = {
   seatedUsers: {},
   messages: [],
   activeMola: null,
-  moviePosters: null, // null means uninitialized, [] means cleared
+  moviePosters: null,
   userSnacks: {},
   vipUsers: {},
-  buffetItems: []
+  reactions: [] // Active floating reactions list
 };
 
 export async function onRequestGet(context) {
@@ -36,7 +36,6 @@ export async function onRequestPost(context) {
       if (data.broadcasterName !== undefined) roomState.broadcasterName = data.broadcasterName;
     } else if (action === 'SEAT_OCCUPY') {
       const { seatCode, user } = data;
-      // Remove user from any existing seat
       Object.keys(roomState.seatedUsers).forEach(code => {
         if (roomState.seatedUsers[code].id === user.id) {
           delete roomState.seatedUsers[code];
@@ -52,6 +51,12 @@ export async function onRequestPost(context) {
     } else if (action === 'DELETE_CHAT') {
       if (Array.isArray(roomState.messages)) {
         roomState.messages = roomState.messages.filter(m => m.id !== data.msgId);
+      }
+    } else if (action === 'SEND_REACTION') {
+      if (!Array.isArray(roomState.reactions)) roomState.reactions = [];
+      roomState.reactions.push(data);
+      if (roomState.reactions.length > 30) {
+        roomState.reactions.shift();
       }
     } else if (action === 'UPDATE_MOLA') {
       roomState.activeMola = data.activeMola;
