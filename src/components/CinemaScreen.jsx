@@ -63,7 +63,7 @@ export function CinemaScreen({
     }
   }, [messages, isFsChatOpen]);
 
-  // WebRTC Screen Share
+  // WebRTC Screen Share (Callable exclusively from Admin Panel)
   const handleStartBroadcast = async () => {
     if (!isAdmin) {
       alert('🔒 Sadece yetkili VIP Adminler (Burak & Yayıncı Admin) ekran paylaşımı başlatabilir!');
@@ -288,28 +288,13 @@ export function CinemaScreen({
                 </div>
               )
             ) : (
-              <div className="screen-standby">
-                <Monitor className="screen-standby-icon" />
-                <div>
-                  <h3 style={{ fontFamily: 'var(--font-heading)', fontSize: '1.25rem', fontWeight: 700, color: 'white' }}>
-                    AFK Sinema Ekranı Hazır
-                  </h3>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--text-dim)', marginTop: '4px' }}>
-                    {isAdmin
-                      ? 'Yayıncı Admin: Discord ekran paylaşımını başlatıp filmi/yayını sinemaya yansıtabilirsiniz.'
-                      : 'Yayın henüz başlamadı. Koltuğunuza kurulun ve yayının başlamasını bekleyin! 🍿'}
-                  </p>
-                </div>
-
-                {isAdmin && (
-                  <button
-                    className="btn-cinema primary"
-                    onClick={handleStartBroadcast}
-                    style={{ marginTop: '12px' }}
-                  >
-                    <Play size={16} /> Discord Ekran Paylaşımını Başlat
-                  </button>
-                )}
+              /* Custom AFK Sinema Placeholder Standby Banner */
+              <div style={{ width: '100%', height: '100%', position: 'relative', overflow: 'hidden', background: '#090406' }}>
+                <img
+                  src="/no_seance.png"
+                  alt="Şu anda bir seans yok - AFK Sinema"
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
               </div>
             )}
           </div>
