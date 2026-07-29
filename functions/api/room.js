@@ -1,143 +1,170 @@
 // Cloudflare Pages Edge State Synchronizer: /api/room
+// Uses Cloudflare KV for shared state across ALL edge instances
+// This solves the "users can't see each other" problem caused by per-instance in-memory state
 
-let roomState = {
+const KV_KEY = 'room_state';
+const HEARTBEAT_TIMEOUT_MS = 8000; // 8 seconds
+
+const DEFAULT_STATE = {
   broadcasterName: '',
   seatedUsers: {},
   messages: [],
   activeMola: null,
   moviePosters: null,
   buffetItems: null,
-  userSnacks: {},
-  vipUsers: {},
   reactions: [],
-  heartbeats: {} // userId -> lastActiveTimestamp
+  heartbeats: {}
 };
 
-// Remove users who closed the tab or haven't sent a heartbeat for 8 seconds
-function cleanupInactiveUsers() {
-  const now = Date.now();
-  const activeThreshold = 8000; // 8 seconds timeout
+async function getState(env) {
+  try {
+    if (env && env.ROOM_KV) {
+      const raw = await env.ROOM_KV.get(KV_KEY, { type: 'json' });
+      return raw || { ...DEFAULT_STATE };
+    }
+  } catch (e) {}
+  return { ...DEFAULT_STATE };
+}
 
-  Object.entries(roomState.seatedUsers).forEach(([seatCode, user]) => {
+async function saveState(env, state) {
+  try {
+    if (env && env.ROOM_KV) {
+      await env.ROOM_KV.put(KV_KEY, JSON.stringify(state));
+    }
+  } catch (e) {}
+}
+
+function cleanupInactiveUsers(state) {
+  const now = Date.now();
+  if (!state.heartbeats) state.heartbeats = {};
+  if (!state.seatedUsers) state.seatedUsers = {};
+
+  Object.entries(state.seatedUsers).forEach(([seatCode, user]) => {
     if (user && user.id) {
-      const lastActive = roomState.heartbeats[user.id];
-      if (!lastActive || (now - lastActive > activeThreshold)) {
-        delete roomState.seatedUsers[seatCode];
-        delete roomState.heartbeats[user.id];
+      const lastActive = state.heartbeats[user.id];
+      if (!lastActive || (now - lastActive > HEARTBEAT_TIMEOUT_MS)) {
+        delete state.seatedUsers[seatCode];
+        delete state.heartbeats[user.id];
       }
     }
   });
+
+  return state;
+}
+
+function corsHeaders() {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type'
+  };
 }
 
 export async function onRequestGet(context) {
-  cleanupInactiveUsers();
+  let state = await getState(context.env);
+  state = cleanupInactiveUsers(state);
+  await saveState(context.env, state);
 
-  return new Response(JSON.stringify(roomState), {
+  return new Response(JSON.stringify(state), {
     headers: {
       'Content-Type': 'application/json',
-      'Access-Control-Allow-Origin': '*',
-      'Cache-Control': 'no-cache, no-store, must-revalidate'
+      'Cache-Control': 'no-cache, no-store, must-revalidate',
+      ...corsHeaders()
     }
   });
 }
 
 export async function onRequestPost(context) {
   try {
-    let payload;
-    const contentType = context.request.headers.get('content-type') || '';
-    if (contentType.includes('application/json')) {
-      payload = await context.request.json();
-    } else {
-      const text = await context.request.text();
-      payload = JSON.parse(text);
-    }
-
+    const payload = await context.request.json();
     const { action, data } = payload;
     const now = Date.now();
 
+    let state = await getState(context.env);
+    if (!state.heartbeats) state.heartbeats = {};
+    if (!state.seatedUsers) state.seatedUsers = {};
+    if (!state.messages) state.messages = [];
+    if (!state.reactions) state.reactions = [];
+
     if (action === 'HEARTBEAT') {
       if (data && data.userId) {
-        roomState.heartbeats[data.userId] = now;
+        state.heartbeats[data.userId] = now;
+        // Also keep the seat occupied
         if (data.seatCode && data.user) {
-          roomState.seatedUsers[data.seatCode] = data.user;
+          // Remove any stale seat for this user
+          Object.keys(state.seatedUsers).forEach(code => {
+            if (state.seatedUsers[code] && state.seatedUsers[code].id === data.userId && code !== data.seatCode) {
+              delete state.seatedUsers[code];
+            }
+          });
+          state.seatedUsers[data.seatCode] = data.user;
         }
       }
-      cleanupInactiveUsers();
+      state = cleanupInactiveUsers(state);
+
     } else if (action === 'LEAVE_ROOM') {
       if (data && data.userId) {
-        Object.keys(roomState.seatedUsers).forEach(code => {
-          if (roomState.seatedUsers[code].id === data.userId) {
-            delete roomState.seatedUsers[code];
+        Object.keys(state.seatedUsers).forEach(code => {
+          if (state.seatedUsers[code] && state.seatedUsers[code].id === data.userId) {
+            delete state.seatedUsers[code];
           }
         });
-        delete roomState.heartbeats[data.userId];
+        delete state.heartbeats[data.userId];
       }
-    } else if (action === 'SYNC_STATE') {
-      if (data.seatedUsers !== undefined) roomState.seatedUsers = data.seatedUsers;
-      if (data.messages !== undefined) roomState.messages = data.messages;
-      if (data.activeMola !== undefined) roomState.activeMola = data.activeMola;
-      if (data.moviePosters !== undefined) roomState.moviePosters = data.moviePosters;
-      if (data.buffetItems !== undefined) roomState.buffetItems = data.buffetItems;
-      if (data.userSnacks !== undefined) roomState.userSnacks = data.userSnacks;
-      if (data.vipUsers !== undefined) roomState.vipUsers = data.vipUsers;
-      if (data.broadcasterName !== undefined) roomState.broadcasterName = data.broadcasterName;
+
     } else if (action === 'SEAT_OCCUPY') {
       const { seatCode, user } = data;
-      Object.keys(roomState.seatedUsers).forEach(code => {
-        if (roomState.seatedUsers[code].id === user.id) {
-          delete roomState.seatedUsers[code];
+      // Remove old seat for this user
+      Object.keys(state.seatedUsers).forEach(code => {
+        if (state.seatedUsers[code] && state.seatedUsers[code].id === user.id) {
+          delete state.seatedUsers[code];
         }
       });
-      roomState.seatedUsers[seatCode] = user;
-      if (user && user.id) {
-        roomState.heartbeats[user.id] = now;
-      }
+      state.seatedUsers[seatCode] = user;
+      if (user && user.id) state.heartbeats[user.id] = now;
+
     } else if (action === 'SEND_CHAT') {
-      if (!Array.isArray(roomState.messages)) roomState.messages = [];
-      roomState.messages.push(data);
-      if (roomState.messages.length > 100) {
-        roomState.messages.shift();
-      }
+      state.messages.push(data);
+      if (state.messages.length > 100) state.messages.shift();
+
     } else if (action === 'DELETE_CHAT') {
-      if (Array.isArray(roomState.messages)) {
-        roomState.messages = roomState.messages.filter(m => m.id !== data.msgId);
-      }
+      state.messages = state.messages.filter(m => m.id !== data.msgId);
+
     } else if (action === 'SEND_REACTION') {
-      if (!Array.isArray(roomState.reactions)) roomState.reactions = [];
-      roomState.reactions.push(data);
-      if (roomState.reactions.length > 30) {
-        roomState.reactions.shift();
-      }
+      state.reactions.push(data);
+      if (state.reactions.length > 30) state.reactions.shift();
+
     } else if (action === 'UPDATE_MOLA') {
-      roomState.activeMola = data.activeMola;
+      state.activeMola = data.activeMola;
+
     } else if (action === 'UPDATE_POSTERS') {
-      roomState.moviePosters = data.moviePosters;
+      state.moviePosters = data.moviePosters;
+
     } else if (action === 'UPDATE_BUFFET') {
-      roomState.buffetItems = data.buffetItems;
+      state.buffetItems = data.buffetItems;
+
+    } else if (action === 'SYNC_STATE') {
+      if (data.seatedUsers !== undefined) state.seatedUsers = data.seatedUsers;
+      if (data.messages !== undefined) state.messages = data.messages;
+      if (data.activeMola !== undefined) state.activeMola = data.activeMola;
+      if (data.moviePosters !== undefined) state.moviePosters = data.moviePosters;
+      if (data.buffetItems !== undefined) state.buffetItems = data.buffetItems;
+      if (data.broadcasterName !== undefined) state.broadcasterName = data.broadcasterName;
     }
 
-    cleanupInactiveUsers();
+    await saveState(context.env, state);
 
-    return new Response(JSON.stringify({ success: true, state: roomState }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
+    return new Response(JSON.stringify({ success: true, state }), {
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() }
     });
   } catch (err) {
     return new Response(JSON.stringify({ success: false, error: err.message }), {
       status: 400,
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'application/json', ...corsHeaders() }
     });
   }
 }
 
 export async function onRequestOptions() {
-  return new Response(null, {
-    headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type'
-    }
-  });
+  return new Response(null, { headers: corsHeaders() });
 }

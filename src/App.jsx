@@ -166,6 +166,12 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
+  // Refs for heartbeat — always have latest values without stale closures
+  const currentUserRef = useRef(currentUser);
+  const seatedUsersRef = useRef(seatedUsers);
+  useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
+  useEffect(() => { seatedUsersRef.current = seatedUsers; }, [seatedUsers]);
+
   // Real-Time Multi-User Room Sync Polling (Every 1.2 seconds sync with Cloudflare Edge)
   useEffect(() => {
     const syncRoom = async () => {
@@ -234,23 +240,25 @@ export default function App() {
     };
 
     syncRoom();
-    const interval = setInterval(syncRoom, 1200);
+    const interval = setInterval(syncRoom, 1000);
     return () => clearInterval(interval);
   }, []);
 
   // Heartbeat Polling & Automatic Tab Close Cleanup
+  // Uses refs so we always have the latest user/seat without stale closures
   useEffect(() => {
-    if (!currentUser) return;
-
-    const mySeat = Object.keys(seatedUsers).find(k => seatedUsers[k].id === currentUser.id);
-
     const sendHeartbeat = () => {
+      const user = currentUserRef.current;
+      if (!user) return;
+      const seated = seatedUsersRef.current;
+      const mySeat = Object.keys(seated).find(k => seated[k] && seated[k].id === user.id);
+
       fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'HEARTBEAT',
-          data: { userId: currentUser.id, seatCode: mySeat, user: currentUser }
+          data: { userId: user.id, seatCode: mySeat || null, user }
         })
       }).catch(() => {});
     };
@@ -260,9 +268,11 @@ export default function App() {
 
     // Immediately remove user when they close the browser or tab
     const handleLeave = () => {
+      const user = currentUserRef.current;
+      if (!user) return;
       const payload = JSON.stringify({
         action: 'LEAVE_ROOM',
-        data: { userId: currentUser.id }
+        data: { userId: user.id }
       });
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/room', payload);
@@ -277,7 +287,7 @@ export default function App() {
       window.removeEventListener('beforeunload', handleLeave);
       window.removeEventListener('pagehide', handleLeave);
     };
-  }, [currentUser, seatedUsers]);
+  }, []); // Mount once — refs handle latest values
 
   useEffect(() => {
     if (currentUser) {
@@ -311,12 +321,28 @@ export default function App() {
     localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters));
   }, [moviePosters]);
 
+  // Auto-seat: when currentUser first appears and they have no seat yet — put them in A1 or first free seat
+  const autoSeatDoneRef = useRef(false);
   useEffect(() => {
-    if (currentUser) {
-      const isAlreadySeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
-      if (!isAlreadySeated) {
-        handleSelectSeat('A1');
-      }
+    if (currentUser && !autoSeatDoneRef.current) {
+      autoSeatDoneRef.current = true;
+      // Find the first available seat
+      const ALL_CODES = [
+        'A1','A2','A3','A4','A5','A6','A7','A8',
+        'B1','B2','B3','B4','B5','B6','B7','B8','B9','B10',
+        'C1','C2','C3','C4','C5','C6','C7','C8','C9','C10',
+        'D1','D2','D3','D4','D5','D6','D7','D8','D9','D10',
+        'E1','E2','E3','E4','E5','E6','E7','E8','E9','E10'
+      ];
+      const takenByOthers = Object.entries(seatedUsersRef.current)
+        .filter(([, u]) => u && u.id !== currentUser.id)
+        .map(([code]) => code);
+      const freeSeat = ALL_CODES.find(c => !takenByOthers.includes(c)) || 'A1';
+      // Small delay to let KV state load first
+      setTimeout(() => handleSelectSeat(freeSeat), 300);
+    }
+    if (!currentUser) {
+      autoSeatDoneRef.current = false;
     }
   }, [currentUser]);
 
