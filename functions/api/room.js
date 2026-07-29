@@ -6,12 +6,32 @@ let roomState = {
   messages: [],
   activeMola: null,
   moviePosters: null,
+  buffetItems: null,
   userSnacks: {},
   vipUsers: {},
-  reactions: [] // Active floating reactions list
+  reactions: [],
+  heartbeats: {} // userId -> lastActiveTimestamp
 };
 
+// Remove users who closed the tab or haven't sent a heartbeat for 8 seconds
+function cleanupInactiveUsers() {
+  const now = Date.now();
+  const activeThreshold = 8000; // 8 seconds timeout
+
+  Object.entries(roomState.seatedUsers).forEach(([seatCode, user]) => {
+    if (user && user.id) {
+      const lastActive = roomState.heartbeats[user.id];
+      if (!lastActive || (now - lastActive > activeThreshold)) {
+        delete roomState.seatedUsers[seatCode];
+        delete roomState.heartbeats[user.id];
+      }
+    }
+  });
+}
+
 export async function onRequestGet(context) {
+  cleanupInactiveUsers();
+
   return new Response(JSON.stringify(roomState), {
     headers: {
       'Content-Type': 'application/json',
@@ -23,14 +43,41 @@ export async function onRequestGet(context) {
 
 export async function onRequestPost(context) {
   try {
-    const payload = await context.request.json();
-    const { action, data } = payload;
+    let payload;
+    const contentType = context.request.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      payload = await context.request.json();
+    } else {
+      const text = await context.request.text();
+      payload = JSON.parse(text);
+    }
 
-    if (action === 'SYNC_STATE') {
+    const { action, data } = payload;
+    const now = Date.now();
+
+    if (action === 'HEARTBEAT') {
+      if (data && data.userId) {
+        roomState.heartbeats[data.userId] = now;
+        if (data.seatCode && data.user) {
+          roomState.seatedUsers[data.seatCode] = data.user;
+        }
+      }
+      cleanupInactiveUsers();
+    } else if (action === 'LEAVE_ROOM') {
+      if (data && data.userId) {
+        Object.keys(roomState.seatedUsers).forEach(code => {
+          if (roomState.seatedUsers[code].id === data.userId) {
+            delete roomState.seatedUsers[code];
+          }
+        });
+        delete roomState.heartbeats[data.userId];
+      }
+    } else if (action === 'SYNC_STATE') {
       if (data.seatedUsers !== undefined) roomState.seatedUsers = data.seatedUsers;
       if (data.messages !== undefined) roomState.messages = data.messages;
       if (data.activeMola !== undefined) roomState.activeMola = data.activeMola;
       if (data.moviePosters !== undefined) roomState.moviePosters = data.moviePosters;
+      if (data.buffetItems !== undefined) roomState.buffetItems = data.buffetItems;
       if (data.userSnacks !== undefined) roomState.userSnacks = data.userSnacks;
       if (data.vipUsers !== undefined) roomState.vipUsers = data.vipUsers;
       if (data.broadcasterName !== undefined) roomState.broadcasterName = data.broadcasterName;
@@ -42,6 +89,9 @@ export async function onRequestPost(context) {
         }
       });
       roomState.seatedUsers[seatCode] = user;
+      if (user && user.id) {
+        roomState.heartbeats[user.id] = now;
+      }
     } else if (action === 'SEND_CHAT') {
       if (!Array.isArray(roomState.messages)) roomState.messages = [];
       roomState.messages.push(data);
@@ -62,7 +112,11 @@ export async function onRequestPost(context) {
       roomState.activeMola = data.activeMola;
     } else if (action === 'UPDATE_POSTERS') {
       roomState.moviePosters = data.moviePosters;
+    } else if (action === 'UPDATE_BUFFET') {
+      roomState.buffetItems = data.buffetItems;
     }
+
+    cleanupInactiveUsers();
 
     return new Response(JSON.stringify({ success: true, state: roomState }), {
       headers: {

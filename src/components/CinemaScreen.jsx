@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Eye, Trash2, Lightbulb } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
-export function CinemaScreen({
+export const CinemaScreen = forwardRef(function CinemaScreen({
   lightsDimmed,
   setLightsDimmed,
   broadcasterName,
@@ -13,7 +13,7 @@ export function CinemaScreen({
   activeMola = null,
   onSendMessage,
   onDeleteMessage
-}) {
+}, ref) {
   const [stream, setStream] = useState(null);
   const [colorGlow, setColorGlow] = useState('rgba(225, 29, 72, 0.4)');
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -32,6 +32,16 @@ export function CinemaScreen({
 
   const isAdmin = isAdminUser(currentUser);
   const isBroadcasting = !!broadcasterName || !!stream;
+
+  // Expose startBroadcast to parent via ref (used by Admin Panel button)
+  useImperativeHandle(ref, () => ({
+    startBroadcast: handleStartBroadcastPublic
+  }));
+
+  // Deferred reference — actual implementation below
+  function handleStartBroadcastPublic() {
+    handleStartBroadcast();
+  }
 
   // Bind WebRTC Stream to Video Element whenever stream changes or videoRef is mounted
   useEffect(() => {
@@ -454,4 +464,4 @@ export function CinemaScreen({
       </div>
     </div>
   );
-}
+});

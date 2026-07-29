@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { CinemaScreen } from './components/CinemaScreen';
 import { CinemaAuditorium } from './components/CinemaAuditorium';
 import { DiscordSidebar } from './components/DiscordSidebar';
@@ -113,6 +113,9 @@ export default function App() {
   const [adminModalSeat, setAdminModalSeat] = useState(null);
   const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
+  // Screen Share Trigger Ref
+  const cinemaScreenRef = useRef(null);
+
   // Movie Posters List
   const [moviePosters, setMoviePosters] = useState(() => {
     try {
@@ -163,7 +166,7 @@ export default function App() {
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // Real-Time Multi-User Room Polling (Every 1.5 seconds sync with Cloudflare Edge)
+  // Real-Time Multi-User Room Sync Polling (Every 1.2 seconds sync with Cloudflare Edge)
   useEffect(() => {
     const syncRoom = async () => {
       try {
@@ -171,7 +174,7 @@ export default function App() {
         if (res.ok) {
           const room = await res.json();
 
-          // Sync & Deduplicate Seated Users
+          // Sync & Deduplicate Seated Users in Real-Time across all clients
           if (room.seatedUsers && typeof room.seatedUsers === 'object') {
             const sanitized = sanitizeSeatedUsers(room.seatedUsers);
             setSeatedUsers(prev => {
@@ -181,14 +184,14 @@ export default function App() {
             });
           }
 
-          // Sync Messages
+          // Sync Chat Messages
           if (Array.isArray(room.messages)) {
             setMessages(prev => {
               return JSON.stringify(room.messages) !== JSON.stringify(prev) ? room.messages : prev;
             });
           }
 
-          // Sync Floating Reactions (100% Silent for everyone!)
+          // Sync Floating Reactions
           if (Array.isArray(room.reactions)) {
             const now = Date.now();
             const validReactions = room.reactions.filter(r => (now - r.timestamp) < 2500);
@@ -207,10 +210,17 @@ export default function App() {
             setActiveMola(room.activeMola);
           }
 
-          // Sync Movie Posters (even when array is empty [])
+          // Sync Movie Posters across all clients
           if (Array.isArray(room.moviePosters)) {
             setMoviePosters(prev => {
               return JSON.stringify(room.moviePosters) !== JSON.stringify(prev) ? room.moviePosters : prev;
+            });
+          }
+
+          // Sync Buffet Items across all clients
+          if (Array.isArray(room.buffetItems)) {
+            setBuffetItems(prev => {
+              return JSON.stringify(room.buffetItems) !== JSON.stringify(prev) ? room.buffetItems : prev;
             });
           }
 
@@ -224,9 +234,50 @@ export default function App() {
     };
 
     syncRoom();
-    const interval = setInterval(syncRoom, 1500);
+    const interval = setInterval(syncRoom, 1200);
     return () => clearInterval(interval);
   }, []);
+
+  // Heartbeat Polling & Automatic Tab Close Cleanup
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const mySeat = Object.keys(seatedUsers).find(k => seatedUsers[k].id === currentUser.id);
+
+    const sendHeartbeat = () => {
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'HEARTBEAT',
+          data: { userId: currentUser.id, seatCode: mySeat, user: currentUser }
+        })
+      }).catch(() => {});
+    };
+
+    sendHeartbeat();
+    const heartbeatInterval = setInterval(sendHeartbeat, 2500);
+
+    // Immediately remove user when they close the browser or tab
+    const handleLeave = () => {
+      const payload = JSON.stringify({
+        action: 'LEAVE_ROOM',
+        data: { userId: currentUser.id }
+      });
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon('/api/room', payload);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleLeave);
+    window.addEventListener('pagehide', handleLeave);
+
+    return () => {
+      clearInterval(heartbeatInterval);
+      window.removeEventListener('beforeunload', handleLeave);
+      window.removeEventListener('pagehide', handleLeave);
+    };
+  }, [currentUser, seatedUsers]);
 
   useEffect(() => {
     if (currentUser) {
@@ -478,6 +529,12 @@ export default function App() {
   const handleLogout = () => {
     if (currentUser) {
       const userId = currentUser.id;
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'LEAVE_ROOM', data: { userId } })
+      }).catch(() => {});
+
       setSeatedUsers(prev => {
         const updated = { ...prev };
         Object.entries(updated).forEach(([code, u]) => {
@@ -559,7 +616,7 @@ export default function App() {
     });
   };
 
-  // APPEND NEW POSTERS TO THE BOTTOM OF THE LIST
+  // APPEND NEW POSTERS TO THE BOTTOM OF THE LIST AND SYNC
   const handleAddMoviePoster = (newPoster) => {
     setMoviePosters(prev => {
       const updated = [...prev, newPoster];
@@ -640,18 +697,42 @@ export default function App() {
   };
 
   const handleAddBuffetItem = (item) => {
-    setBuffetItems(prev => [...prev, item]);
+    setBuffetItems(prev => {
+      const updated = [...prev, item];
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleUpdateBuffetItem = (itemId, updatedFields) => {
-    setBuffetItems(prev => prev.map(item => {
-      if (item.id === itemId) return { ...item, ...updatedFields };
-      return item;
-    }));
+    setBuffetItems(prev => {
+      const updated = prev.map(item => {
+        if (item.id === itemId) return { ...item, ...updatedFields };
+        return item;
+      });
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleDeleteBuffetItem = (itemId) => {
-    setBuffetItems(prev => prev.filter(i => i.id !== itemId));
+    setBuffetItems(prev => {
+      const updated = prev.filter(i => i.id !== itemId);
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
+      }).catch(() => {});
+      return updated;
+    });
   };
 
   const handleUpdateCreditSettings = (newSettings) => {
@@ -695,6 +776,12 @@ export default function App() {
       if (u.id === userId) delete updated[code];
     });
     setSeatedUsers(sanitizeSeatedUsers(updated));
+
+    fetch('/api/room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'LEAVE_ROOM', data: { userId } })
+    }).catch(() => {});
 
     if (currentUser && currentUser.id === userId) {
       setCurrentUser(null);
@@ -785,6 +872,12 @@ export default function App() {
     setIsAdminModalOpen(true);
   };
 
+  const handleTriggerStartBroadcast = () => {
+    if (cinemaScreenRef.current && cinemaScreenRef.current.startBroadcast) {
+      cinemaScreenRef.current.startBroadcast();
+    }
+  };
+
   const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
   const currentCreditBalance = currentUser ? (isAdmin ? '∞' : (userCredits[currentUser.id] || 50)) : 0;
   const mySnacks = currentUser ? (userSnacks[currentUser.id] || {}) : {};
@@ -872,6 +965,7 @@ export default function App() {
         {/* Workspace: Screen + Auditorium */}
         <main className="cinema-hall-workspace" style={{ flex: 1 }}>
           <CinemaScreen
+            ref={cinemaScreenRef}
             lightsDimmed={lightsDimmed}
             setLightsDimmed={setLightsDimmed}
             broadcasterName={broadcasterName}
@@ -1012,7 +1106,7 @@ export default function App() {
         onUpdateCreditSettings={handleUpdateCreditSettings}
         isBroadcasting={!!broadcasterName}
         broadcasterName={broadcasterName}
-        onStartBroadcast={() => {}}
+        onStartBroadcast={handleTriggerStartBroadcast}
         onStopBroadcast={() => setBroadcasterName('')}
         lightsDimmed={lightsDimmed}
         onToggleLights={() => setLightsDimmed(!lightsDimmed)}
