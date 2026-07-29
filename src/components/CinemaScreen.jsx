@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Eye, Trash2 } from 'lucide-react';
+import { Play, Pause, Monitor, Maximize, Coffee, MessageSquare, X, Send, Eye, Trash2, Lightbulb } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
@@ -150,7 +150,7 @@ export function CinemaScreen({
       ref={screenFrameRef}
       style={{
         position: 'relative',
-        background: isFullscreen ? '#090406' : 'transparent',
+        background: isFullscreen ? (lightsDimmed ? '#020102' : '#090406') : 'transparent',
         width: '100%',
         height: isFullscreen ? '100vh' : 'auto',
         display: 'flex',
@@ -313,12 +313,12 @@ export function CinemaScreen({
           </div>
         </div>
 
-        {/* FULLSCREEN CHAT SIDE PANEL (With Message Deletion Support!) */}
+        {/* FULLSCREEN CHAT SIDE PANEL */}
         {isFullscreen && isFsChatOpen && (
           <div style={{
             width: '320px',
             height: '100%',
-            background: 'rgba(12, 5, 8, 0.95)',
+            background: lightsDimmed ? 'rgba(4, 1, 2, 0.98)' : 'rgba(12, 5, 8, 0.95)',
             borderLeft: '1px solid var(--bg-card-border)',
             display: 'flex',
             flexDirection: 'column',
@@ -414,7 +414,7 @@ export function CinemaScreen({
         justifyContent: 'space-between',
         width: '100%',
         padding: '8px 14px',
-        background: isFullscreen ? '#0e0609' : 'transparent',
+        background: isFullscreen ? (lightsDimmed ? '#030102' : '#0e0609') : 'transparent',
         borderTop: isFullscreen ? '1px solid rgba(255,255,255,0.08)' : 'none'
       }}>
         {/* Left: Broadcaster Info */}
@@ -437,13 +437,24 @@ export function CinemaScreen({
             </button>
           )}
 
-          <button
-            className="btn-cinema"
-            onClick={() => setLightsDimmed(!lightsDimmed)}
-            style={{ padding: '6px 12px', fontSize: '0.75rem' }}
-          >
-            {lightsDimmed ? '💡 Işıkları Aç' : '🌙 Işıkları Kapat'}
-          </button>
+          {/* Lights Control Button — Exclusively for Admin Users */}
+          {isAdmin && (
+            <button
+              className="btn-cinema"
+              onClick={() => setLightsDimmed(!lightsDimmed)}
+              style={{
+                padding: '6px 12px',
+                fontSize: '0.75rem',
+                background: lightsDimmed ? 'linear-gradient(135deg, #fbbf24, #d97706)' : 'rgba(255,255,255,0.06)',
+                color: lightsDimmed ? 'black' : 'white',
+                fontWeight: 700
+              }}
+              title="Sadece VIP Adminler Kullanabilir"
+            >
+              <Lightbulb size={14} color={lightsDimmed ? 'black' : 'var(--accent-gold)'} />
+              {lightsDimmed ? '💡 Işıkları Aç' : '🌙 Işıkları Kapat'}
+            </button>
+          )}
 
           <button
             className="btn-cinema primary"

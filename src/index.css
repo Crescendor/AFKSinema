@@ -69,6 +69,54 @@ body {
   flex-direction: column;
   min-height: 100vh;
   background: radial-gradient(circle at 50% 0%, #290a14 0%, #090406 75%);
+  transition: background 0.5s ease;
+}
+
+/* Dimmed Lights Cinema Mode */
+.app-container.lights-dimmed {
+  background: radial-gradient(circle at 50% 0%, #0c0205 0%, #020102 95%) !important;
+}
+
+.app-container.lights-dimmed .app-header {
+  background: rgba(4, 1, 2, 0.98) !important;
+  border-bottom-color: rgba(225, 29, 72, 0.08) !important;
+}
+
+.app-container.lights-dimmed .auditorium-container {
+  opacity: 0.25;
+  filter: brightness(0.35) contrast(1.2);
+  transition: opacity 0.5s ease, filter 0.5s ease;
+}
+
+.app-container.lights-dimmed .auditorium-container:hover {
+  opacity: 0.9;
+  filter: brightness(0.95);
+}
+
+.app-container.lights-dimmed .discord-sidebar,
+.app-container.lights-dimmed .cinema-controls-deck {
+  background: rgba(5, 2, 4, 0.98) !important;
+  opacity: 0.35;
+  transition: opacity 0.4s ease;
+}
+
+.app-container.lights-dimmed .discord-sidebar:hover,
+.app-container.lights-dimmed .cinema-controls-deck:hover {
+  opacity: 1;
+}
+
+.app-container.lights-dimmed .movie-billboard-left {
+  opacity: 0.2;
+  transition: opacity 0.4s ease;
+}
+
+.app-container.lights-dimmed .movie-billboard-left:hover {
+  opacity: 1;
+}
+
+.app-container.lights-dimmed .ambilight-glow {
+  opacity: 0.95;
+  filter: blur(55px);
 }
 
 .cinema-app-body {
