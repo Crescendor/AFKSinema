@@ -40,16 +40,18 @@ export function AdminMasterPanelModal({
 }) {
   const [activeTab, setActiveTab] = useState('screen');
 
-  // Movie Poster State
+  // Movie Poster Form State
   const [movieTitle, setMovieTitle] = useState('');
   const [movieImageUrl, setMovieImageUrl] = useState('');
-  const [movieReleaseDate, setMovieReleaseDate] = useState('29 Temmuz 2026');
+  const [movieDateTime, setMovieDateTime] = useState('');
+  const [isTBDDate, setIsTBDDate] = useState(false);
 
   // Poster Editing State
   const [editingPosterId, setEditingPosterId] = useState(null);
   const [editPosterTitle, setEditPosterTitle] = useState('');
   const [editPosterImageUrl, setEditPosterImageUrl] = useState('');
-  const [editPosterReleaseDate, setEditPosterReleaseDate] = useState('');
+  const [editPosterDateTime, setEditPosterDateTime] = useState('');
+  const [editIsTBDDate, setEditIsTBDDate] = useState(false);
 
   // Mola State
   const [molaPreset, setMolaPreset] = useState('🚽 Çiş Molası');
@@ -79,6 +81,24 @@ export function AdminMasterPanelModal({
 
   if (!isOpen) return null;
 
+  // Format HTML5 datetime-local string to clean Turkish readable format (e.g., 29 Temmuz 2026 21:00)
+  const formatDisplayDate = (datetimeStr, isTBD) => {
+    if (isTBD || !datetimeStr) return 'Çok Yakında';
+    try {
+      const dt = new Date(datetimeStr);
+      if (isNaN(dt.getTime())) return datetimeStr;
+      return dt.toLocaleString('tr-TR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (e) {
+      return datetimeStr;
+    }
+  };
+
   const handleMovieFileUpload = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
@@ -98,37 +118,45 @@ export function AdminMasterPanelModal({
     e.preventDefault();
     if (!movieTitle.trim() || !movieImageUrl.trim()) return;
 
+    const formattedDate = formatDisplayDate(movieDateTime, isTBDDate);
+
     onAddMoviePoster({
       id: 'poster_' + Date.now(),
       title: movieTitle.trim(),
       imageUrl: movieImageUrl.trim(),
-      releaseDate: movieReleaseDate.trim() || 'Çok Yakında',
-      status: 'Yakında'
+      releaseDate: formattedDate,
+      status: 'Yakında' // ALWAYS DEFAULT TO YAKINDA! NEVER OYNATILIYOR!
     });
 
     setMovieTitle('');
     setMovieImageUrl('');
+    setMovieDateTime('');
+    setIsTBDDate(false);
   };
 
   const handleStartEditPoster = (p) => {
     setEditingPosterId(p.id);
     setEditPosterTitle(p.title);
     setEditPosterImageUrl(p.imageUrl);
-    setEditPosterReleaseDate(p.releaseDate || '');
+    setEditIsTBDDate(p.releaseDate === 'Çok Yakında');
+    setEditPosterDateTime('');
   };
 
   const handleSaveEditPoster = (posterId) => {
+    const formattedDate = formatDisplayDate(editPosterDateTime, editIsTBDDate);
+
     const updated = moviePosters.map(p => {
       if (p.id === posterId) {
         return {
           ...p,
           title: editPosterTitle.trim(),
           imageUrl: editPosterImageUrl.trim(),
-          releaseDate: editPosterReleaseDate.trim()
+          releaseDate: formattedDate || p.releaseDate
         };
       }
       return p;
     });
+
     if (onUpdateMoviePosters) onUpdateMoviePosters(updated);
     setEditingPosterId(null);
   };
@@ -328,30 +356,48 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 1: MOVIE POSTERS & EDITING */}
+        {/* TAB 1: MOVIE POSTERS, DATETIME PICKER & SEANCE CONTROL */}
         {activeTab === 'movies' && (
           <div>
             <form onSubmit={handleAddPosterSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--bg-card-border)' }}>
               <div style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--cinema-red)', marginBottom: '10px' }}>
-                + Yeni Film Afişi Ekle
+                + Yeni Film Afişi Ekle (Varsayılan: Yakında)
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+              <div style={{ marginBottom: '8px' }}>
                 <input
                   type="text"
                   placeholder="Film Adı (Örn: Dune Part 2)"
                   value={movieTitle}
                   onChange={(e) => setMovieTitle(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
+                  style={{ width: '100%', background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
                 />
+              </div>
 
-                <input
-                  type="text"
-                  placeholder="Tarih (Örn: 29 Temmuz 2026)"
-                  value={movieReleaseDate}
-                  onChange={(e) => setMovieReleaseDate(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px 10px', color: 'white', fontSize: '0.8rem' }}
-                />
+              {/* Datetime Picker + "Belli Değil / Yakında" Checkbox */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 160px', gap: '8px', marginBottom: '8px', alignItems: 'center' }}>
+                {!isTBDDate ? (
+                  <input
+                    type="datetime-local"
+                    value={movieDateTime}
+                    onChange={(e) => setMovieDateTime(e.target.value)}
+                    style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '6px', padding: '8px', color: 'white', fontSize: '0.8rem' }}
+                  />
+                ) : (
+                  <div style={{ background: 'rgba(251, 191, 36, 0.1)', border: '1px solid rgba(251, 191, 36, 0.3)', padding: '8px', borderRadius: '6px', fontSize: '0.78rem', color: 'var(--accent-gold)', fontWeight: 700 }}>
+                    🍿 Tarih: Çok Yakında
+                  </div>
+                )}
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={isTBDDate}
+                    onChange={(e) => setIsTBDDate(e.target.checked)}
+                    style={{ accentColor: 'var(--cinema-red)' }}
+                  />
+                  Tarih Belli Değil
+                </label>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '8px', marginBottom: '10px' }}>
@@ -370,7 +416,7 @@ export function AdminMasterPanelModal({
               </div>
 
               <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '8px', fontSize: '0.82rem', justifyContent: 'center' }}>
-                Afişi Yayınla
+                Afişi Liste-ye Ekle (🍿 Yakında)
               </button>
             </form>
 
@@ -378,21 +424,32 @@ export function AdminMasterPanelModal({
               {moviePosters.map(p => (
                 <div key={p.id} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
                   {editingPosterId === p.id ? (
-                    /* Inline Poster Edit Form */
+                    /* Inline Poster Edit Form with Datetime Picker */
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
-                        <input
-                          type="text"
-                          value={editPosterTitle}
-                          onChange={(e) => setEditPosterTitle(e.target.value)}
-                          style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
-                        />
-                        <input
-                          type="text"
-                          value={editPosterReleaseDate}
-                          onChange={(e) => setEditPosterReleaseDate(e.target.value)}
-                          style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
-                        />
+                      <input
+                        type="text"
+                        value={editPosterTitle}
+                        onChange={(e) => setEditPosterTitle(e.target.value)}
+                        style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                      />
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 140px', gap: '6px', alignItems: 'center' }}>
+                        {!editIsTBDDate ? (
+                          <input
+                            type="datetime-local"
+                            value={editPosterDateTime}
+                            onChange={(e) => setEditPosterDateTime(e.target.value)}
+                            style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.78rem' }}
+                          />
+                        ) : (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--accent-gold)', fontWeight: 700 }}>🍿 Tarih: Çok Yakında</div>
+                        )}
+                        <label style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={editIsTBDDate}
+                            onChange={(e) => setEditIsTBDDate(e.target.checked)}
+                          /> Tarih Belli Değil
+                        </label>
                       </div>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '6px' }}>
                         <input
@@ -412,14 +469,14 @@ export function AdminMasterPanelModal({
                       </div>
                     </div>
                   ) : (
-                    /* Normal Poster Row */
+                    /* Normal Poster Row with Seansı Başlat / Seansı Bitir Buttons */
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <img src={p.imageUrl} alt={p.title} style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px' }} />
                         <div>
                           <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
                           <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                            <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status || 'Yakında'}
+                            <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Çok Yakında'} • <span style={{ color: p.status === 'Oynatılıyor' ? 'var(--cinema-red)' : p.status === 'Geçmiş Seans' ? 'var(--text-dim)' : 'var(--accent-gold)', fontWeight: 800 }}>{p.status || 'Yakında'}</span>
                           </div>
                         </div>
                       </div>
@@ -433,19 +490,22 @@ export function AdminMasterPanelModal({
                           <Edit2 size={12} /> Düzenle
                         </button>
 
+                        {/* SEANSI BAŞLAT & SEANSI BİTİR BUTTONS */}
                         {p.status === 'Oynatılıyor' ? (
                           <button
                             onClick={() => handleEndSeance(p.id)}
                             style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Seansı Sonlandır ve Geçmiş Seanslara Geçir"
                           >
-                            <Square size={12} /> Bitir
+                            <Square size={12} /> Seansı Bitir
                           </button>
                         ) : (
                           <button
                             onClick={() => handleStartSeance(p.id)}
                             style={{ background: 'var(--cinema-red)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                            title="Bu Filmin Seansını Başlat"
                           >
-                            <Play size={12} /> Başlat
+                            <Play size={12} /> Seansı Başlat
                           </button>
                         )}
                         <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>

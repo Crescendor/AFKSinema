@@ -36,7 +36,7 @@ const INITIAL_MOVIE_POSTERS = [
     title: 'Dune: Part Two',
     imageUrl: 'https://images.unsplash.com/photo-1534447677768-be436bb09401?auto=format&fit=crop&w=600&q=80',
     releaseDate: '29 Temmuz 2026',
-    status: 'Oynatılıyor'
+    status: 'Yakında'
   },
   {
     id: 'poster2',
