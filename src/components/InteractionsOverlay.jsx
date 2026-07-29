@@ -1,10 +1,8 @@
 import React from 'react';
 import confetti from 'canvas-confetti';
 import { ShoppingBag } from 'lucide-react';
-import { sounds } from '../utils/soundUtils';
 
 export function InteractionsOverlay({
-  activeReactions,
   onTriggerReaction,
   mySeatCode,
   mySnacks = {},
@@ -12,7 +10,6 @@ export function InteractionsOverlay({
   onOpenBuffet
 }) {
   const handleConfetti = () => {
-    sounds.playApplause();
     confetti({
       particleCount: 80,
       spread: 70,
@@ -37,67 +34,50 @@ export function InteractionsOverlay({
       return;
     }
 
-    sounds.playPopcornCrunch();
     onTriggerReaction('🍿');
     if (onConsumePopcorn) onConsumePopcorn();
   };
 
   return (
-    <>
-      {/* Active Floating Reactions over seats */}
-      <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 60, overflow: 'hidden' }}>
-        {activeReactions.map((r) => (
-          <div
-            key={r.id}
-            className="floating-reaction"
-            style={{ left: `${r.x}%`, top: '60%' }}
-          >
-            {r.emoji}
-          </div>
-        ))}
-      </div>
+    <div className="cinema-controls-deck" style={{ position: 'relative', zIndex: 45 }}>
+      {/* Buffet Button */}
+      <button
+        className="btn-cinema primary"
+        onClick={onOpenBuffet}
+        style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #d97706, #b45309)', borderColor: 'var(--accent-gold)' }}
+      >
+        <ShoppingBag size={16} /> Sinema Büfesi
+      </button>
 
-      {/* Quick Control Deck under Cinema Auditorium */}
-      <div className="cinema-controls-deck" style={{ position: 'relative', zIndex: 45 }}>
-        {/* Buffet Button */}
-        <button
-          className="btn-cinema primary"
-          onClick={onOpenBuffet}
-          style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #d97706, #b45309)', borderColor: 'var(--accent-gold)' }}
-        >
-          <ShoppingBag size={16} /> Sinema Büfesi
-        </button>
+      {/* Popcorn Eat button with 20-Bites Counter */}
+      <button
+        className="btn-cinema"
+        onClick={handleEatPopcornClick}
+        style={{ opacity: hasPopcorn ? 1 : 0.65, border: hasPopcorn ? '1px solid var(--accent-gold)' : '1px solid rgba(255,255,255,0.1)' }}
+        title={hasPopcorn ? `Mısır Ye! (Kalan: ${remainingBites}/20 Hak veya 20 Dk Süre)` : 'Mısırınız yok! Büfeden satın alın.'}
+      >
+        🍿 {hasPopcorn ? `Mısır Ye (${remainingBites}/20)` : 'Mısır Al'}
+      </button>
 
-        {/* Popcorn Eat button with 20-Bites Counter */}
-        <button
-          className="btn-cinema"
-          onClick={handleEatPopcornClick}
-          style={{ opacity: hasPopcorn ? 1 : 0.65, border: hasPopcorn ? '1px solid var(--accent-gold)' : '1px solid rgba(255,255,255,0.1)' }}
-          title={hasPopcorn ? `Mısır Ye! (Kalan: ${remainingBites}/20 Hak veya 20 Dk Süre)` : 'Mısırınız yok! Büfeden satın alın.'}
-        >
-          🍿 {hasPopcorn ? `Mısır Ye (${remainingBites}/20)` : 'Mısır Al'}
-        </button>
+      <button className="btn-cinema" onClick={() => onTriggerReaction('👏')}>
+        👏 Alkışla
+      </button>
 
-        <button className="btn-cinema" onClick={() => { sounds.playApplause(); onTriggerReaction('👏'); }}>
-          👏 Alkışla
-        </button>
+      <button className="btn-cinema" onClick={() => onTriggerReaction('❤️')}>
+        ❤️ Kalp At
+      </button>
 
-        <button className="btn-cinema" onClick={() => { sounds.playEmojiPop(); onTriggerReaction('❤️'); }}>
-          ❤️ Kalp At
-        </button>
+      <button className="btn-cinema" onClick={() => onTriggerReaction('🔥')}>
+        🔥 Hype
+      </button>
 
-        <button className="btn-cinema" onClick={() => { sounds.playEmojiPop(); onTriggerReaction('🔥'); }}>
-          🔥 Hype
-        </button>
+      <button className="btn-cinema" onClick={() => onTriggerReaction('😱')}>
+        😱 Şaşır
+      </button>
 
-        <button className="btn-cinema" onClick={() => { sounds.playEmojiPop(); onTriggerReaction('😱'); }}>
-          😱 Şaşır
-        </button>
-
-        <button className="btn-cinema primary" onClick={handleConfetti} style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: 'black' }}>
-          🎉 Konfeti Patlat!
-        </button>
-      </div>
-    </>
+      <button className="btn-cinema primary" onClick={handleConfetti} style={{ background: 'linear-gradient(135deg, #fbbf24 0%, #d97706 100%)', color: 'black' }}>
+        🎉 Konfeti Patlat!
+      </button>
+    </div>
   );
 }

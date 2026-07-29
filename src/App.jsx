@@ -178,7 +178,7 @@ export default function App() {
             });
           }
 
-          // Sync Floating Reactions (Without playing audio for remote users!)
+          // Sync Floating Reactions (100% Silent for everyone!)
           if (Array.isArray(room.reactions)) {
             const now = Date.now();
             const validReactions = room.reactions.filter(r => (now - r.timestamp) < 2500);
@@ -708,25 +708,21 @@ export default function App() {
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
+  // Real-Time Floating Reactions (Directly above the seated user avatar head!)
   const handleTriggerReaction = (emoji) => {
-    let seatX = 50;
     let mySeatCode = null;
 
     if (currentUser) {
       Object.entries(seatedUsers).forEach(([code, u]) => {
         if (u.id === currentUser.id) mySeatCode = code;
       });
-      if (mySeatCode) {
-        const colIndex = parseInt(mySeatCode.substring(1)) || 5;
-        seatX = 15 + (colIndex * 7);
-      }
     }
 
     const newReaction = {
       id: 'react_' + Date.now() + '_' + Math.random(),
       emoji,
-      x: seatX + (Math.random() * 8 - 4),
-      y: 15 + (Math.random() * 10),
+      seatCode: mySeatCode,
+      userId: currentUser?.id,
       timestamp: Date.now()
     };
 
@@ -853,6 +849,7 @@ export default function App() {
             seatedUsers={seatedUsers}
             userSnacks={userSnacks}
             vipUsers={vipUsers}
+            activeReactions={activeReactions}
             currentUser={currentUser}
             onSelectSeat={handleSelectSeat}
             onOpenLoginModal={(seat) => { setTargetSeatCode(seat); setIsLoginModalOpen(true); }}

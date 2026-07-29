@@ -1,5 +1,5 @@
 import React from 'react';
-import { Crown, Armchair, Shield } from 'lucide-react';
+import { Crown, Armchair } from 'lucide-react';
 import { sounds } from '../utils/soundUtils';
 import { isAdminUser } from '../utils/discordAuth';
 
@@ -15,6 +15,7 @@ export function CinemaAuditorium({
   seatedUsers,
   userSnacks = {},
   vipUsers = {},
+  activeReactions = [],
   currentUser,
   onSelectSeat,
   onOpenLoginModal,
@@ -32,7 +33,6 @@ export function CinemaAuditorium({
       return;
     }
 
-    // VIP Seat Restriction: Row A is VIP Only!
     if (isVip && !isMyVip) {
       alert('⭐ VIP KOLTUK:\nSıra A koltukları yalnızca VIP Üyelere ve Adminlere özeldir.\nAdmininizden VIP üyelik talep edebilirsiniz!');
       return;
@@ -91,6 +91,11 @@ export function CinemaAuditorium({
 
               const snacks = occupant ? (userSnacks[occupant.id] || {}) : {};
 
+              // Find reactions triggered by this specific seated user
+              const userReactions = occupant
+                ? activeReactions.filter(r => r.seatCode === seatCode || r.userId === occupant.id)
+                : [];
+
               let seatClass = 'cinema-seat';
               if (isVip) seatClass += ' vip';
               if (occupant) seatClass += ' occupied';
@@ -101,10 +106,31 @@ export function CinemaAuditorium({
                   key={seatCode}
                   className={seatClass}
                   onClick={() => handleSeatClick(row.id, seatNum, isVip)}
+                  style={{ position: 'relative' }}
                 >
                   <div className="seat-headrest" />
 
-                  {/* Left & Right Buffet Snack Items beside Avatar (LARGER FONT SIZE) */}
+                  {/* Floating Reactions popping directly out of avatar head */}
+                  {userReactions.map(r => (
+                    <div
+                      key={r.id}
+                      style={{
+                        position: 'absolute',
+                        top: '-32px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        fontSize: '1.8rem',
+                        zIndex: 100,
+                        pointerEvents: 'none',
+                        animation: 'floatUp 2s ease-out forwards',
+                        filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.9))'
+                      }}
+                    >
+                      {r.emoji}
+                    </div>
+                  ))}
+
+                  {/* Left & Right Buffet Snack Items beside Avatar */}
                   {occupant && (
                     <>
                       {snacks.left && snacks.left.icon && (
@@ -114,9 +140,7 @@ export function CinemaAuditorium({
                           top: '-14px',
                           fontSize: '1.5rem',
                           filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.9))',
-                          zIndex: 20,
-                          transform: 'scale(1.1)',
-                          animation: 'pulse 2s infinite'
+                          zIndex: 20
                         }}>
                           {snacks.left.icon}
                         </div>
@@ -133,9 +157,7 @@ export function CinemaAuditorium({
                           top: '-14px',
                           fontSize: '1.5rem',
                           filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.9))',
-                          zIndex: 20,
-                          transform: 'scale(1.1)',
-                          animation: 'pulse 2s infinite'
+                          zIndex: 20
                         }}>
                           {snacks.right.icon}
                         </div>
