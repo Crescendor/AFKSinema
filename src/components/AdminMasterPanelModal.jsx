@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Trash2, Ban, X, Play, Square, Calendar, Lightbulb, Smile, CheckCircle, Clock, History } from 'lucide-react';
+import { Shield, Film, Coffee, Users, ShoppingBag, Monitor, Trash2, Ban, X, Play, Square, Calendar, Lightbulb, Smile, Edit2, Check, Clock, Coins } from 'lucide-react';
 
 const BUFFET_EMOJI_PALETTE = [
   '🍿', '🥤', '🍦', '🍫', '🍺', '👑', '🍕', '🍔', 
@@ -27,7 +27,10 @@ export function AdminMasterPanelModal({
   onToggleVip,
   buffetItems,
   onAddBuffetItem,
+  onUpdateBuffetItem,
   onDeleteBuffetItem,
+  creditSettings,
+  onUpdateCreditSettings,
   isBroadcasting,
   broadcasterName,
   onStartBroadcast,
@@ -42,6 +45,12 @@ export function AdminMasterPanelModal({
   const [movieImageUrl, setMovieImageUrl] = useState('');
   const [movieReleaseDate, setMovieReleaseDate] = useState('29 Temmuz 2026');
 
+  // Poster Editing State
+  const [editingPosterId, setEditingPosterId] = useState(null);
+  const [editPosterTitle, setEditPosterTitle] = useState('');
+  const [editPosterImageUrl, setEditPosterImageUrl] = useState('');
+  const [editPosterReleaseDate, setEditPosterReleaseDate] = useState('');
+
   // Mola State
   const [molaPreset, setMolaPreset] = useState('🚽 Çiş Molası');
   const [customMolaTitle, setCustomMolaTitle] = useState('');
@@ -52,19 +61,34 @@ export function AdminMasterPanelModal({
   const [grantCreditAmount, setGrantCreditAmount] = useState(50);
   const [kickMinutes, setKickMinutes] = useState('5');
 
+  // Credit/Minute Settings State
+  const [settingIntervalMin, setSettingIntervalMin] = useState(creditSettings?.intervalMinutes || 10);
+  const [settingStandardCred, setSettingStandardCred] = useState(creditSettings?.standardCredits || 20);
+  const [settingVipCred, setSettingVipCred] = useState(creditSettings?.vipCredits || 50);
+
   // Buffet Item State
   const [buffetName, setBuffetName] = useState('');
   const [buffetPrice, setBuffetPrice] = useState(30);
   const [buffetIcon, setBuffetIcon] = useState('🍿');
 
+  // Buffet Item Editing State
+  const [editingBuffetId, setEditingBuffetId] = useState(null);
+  const [editBuffetName, setEditBuffetName] = useState('');
+  const [editBuffetPrice, setEditBuffetPrice] = useState(30);
+  const [editBuffetIcon, setEditBuffetIcon] = useState('🍿');
+
   if (!isOpen) return null;
 
-  const handleMovieFileUpload = (e) => {
+  const handleMovieFileUpload = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
       const reader = new FileReader();
       reader.onload = (uploadEvent) => {
-        setMovieImageUrl(uploadEvent.target.result);
+        if (isEdit) {
+          setEditPosterImageUrl(uploadEvent.target.result);
+        } else {
+          setMovieImageUrl(uploadEvent.target.result);
+        }
       };
       reader.readAsDataURL(file);
     }
@@ -86,10 +110,32 @@ export function AdminMasterPanelModal({
     setMovieImageUrl('');
   };
 
+  const handleStartEditPoster = (p) => {
+    setEditingPosterId(p.id);
+    setEditPosterTitle(p.title);
+    setEditPosterImageUrl(p.imageUrl);
+    setEditPosterReleaseDate(p.releaseDate || '');
+  };
+
+  const handleSaveEditPoster = (posterId) => {
+    const updated = moviePosters.map(p => {
+      if (p.id === posterId) {
+        return {
+          ...p,
+          title: editPosterTitle.trim(),
+          imageUrl: editPosterImageUrl.trim(),
+          releaseDate: editPosterReleaseDate.trim()
+        };
+      }
+      return p;
+    });
+    if (onUpdateMoviePosters) onUpdateMoviePosters(updated);
+    setEditingPosterId(null);
+  };
+
   const handleStartSeance = (posterId) => {
     const updated = moviePosters.map(p => {
       if (p.id === posterId) return { ...p, status: 'Oynatılıyor' };
-      // Stop other playing seances
       if (p.status === 'Oynatılıyor') return { ...p, status: 'Geçmiş Seans' };
       return p;
     });
@@ -102,6 +148,36 @@ export function AdminMasterPanelModal({
       return p;
     });
     if (onUpdateMoviePosters) onUpdateMoviePosters(updated);
+  };
+
+  const handleStartEditBuffet = (item) => {
+    setEditingBuffetId(item.id);
+    setEditBuffetName(item.name);
+    setEditBuffetPrice(item.price);
+    setEditBuffetIcon(item.icon);
+  };
+
+  const handleSaveEditBuffet = (itemId) => {
+    if (onUpdateBuffetItem) {
+      onUpdateBuffetItem(itemId, {
+        name: editBuffetName.trim(),
+        price: parseInt(editBuffetPrice) || 20,
+        icon: editBuffetIcon.trim() || '🍿'
+      });
+    }
+    setEditingBuffetId(null);
+  };
+
+  const handleSaveCreditSettingsSubmit = (e) => {
+    e.preventDefault();
+    if (onUpdateCreditSettings) {
+      onUpdateCreditSettings({
+        intervalMinutes: parseInt(settingIntervalMin) || 10,
+        standardCredits: parseInt(settingStandardCred) || 20,
+        vipCredits: parseInt(settingVipCred) || 50
+      });
+      alert('✅ Kredi ve Süre Ayarları Başarıyla Güncellendi!');
+    }
   };
 
   const handleStartMolaSubmit = (e) => {
@@ -156,7 +232,7 @@ export function AdminMasterPanelModal({
 
   return (
     <div className="modal-overlay" onClick={onClose} style={{ zIndex: 100000 }}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '660px', padding: '28px' }}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '680px', padding: '28px' }}>
         {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -168,7 +244,7 @@ export function AdminMasterPanelModal({
                 👑 VIP Admin Ana Kontrol Paneli
               </h2>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Yayın, film afişleri, mola, kullanıcılar ve büfe yönetimi tek ekranda
+                Yayın, afişler, mola, dakikalık kredi ayarları ve büfe yönetimi
               </p>
             </div>
           </div>
@@ -252,7 +328,7 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 1: MOVIE POSTERS & SEANCE MANAGEMENT */}
+        {/* TAB 1: MOVIE POSTERS & EDITING */}
         {activeTab === 'movies' && (
           <div>
             <form onSubmit={handleAddPosterSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '14px', borderRadius: '12px', marginBottom: '16px', border: '1px solid var(--bg-card-border)' }}>
@@ -289,7 +365,7 @@ export function AdminMasterPanelModal({
 
                 <label className="btn-cinema" style={{ display: 'flex', justifyContent: 'center', padding: '6px', fontSize: '0.75rem', cursor: 'pointer' }}>
                   📷 Görsel Yükle
-                  <input type="file" accept="image/*" onChange={handleMovieFileUpload} style={{ display: 'none' }} />
+                  <input type="file" accept="image/*" onChange={(e) => handleMovieFileUpload(e, false)} style={{ display: 'none' }} />
                 </label>
               </div>
 
@@ -300,35 +376,82 @@ export function AdminMasterPanelModal({
 
             <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {moviePosters.map(p => (
-                <div key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <img src={p.imageUrl} alt={p.title} style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px' }} />
-                    <div>
-                      <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status || 'Yakında'}
+                <div key={p.id} style={{ padding: '8px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.06)' }}>
+                  {editingPosterId === p.id ? (
+                    /* Inline Poster Edit Form */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                        <input
+                          type="text"
+                          value={editPosterTitle}
+                          onChange={(e) => setEditPosterTitle(e.target.value)}
+                          style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                        />
+                        <input
+                          type="text"
+                          value={editPosterReleaseDate}
+                          onChange={(e) => setEditPosterReleaseDate(e.target.value)}
+                          style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                        />
+                      </div>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: '6px' }}>
+                        <input
+                          type="url"
+                          value={editPosterImageUrl}
+                          onChange={(e) => setEditPosterImageUrl(e.target.value)}
+                          style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                        />
+                        <label className="btn-cinema" style={{ padding: '4px', fontSize: '0.7rem', justifyContent: 'center', cursor: 'pointer' }}>
+                          📷 Değiştir
+                          <input type="file" accept="image/*" onChange={(e) => handleMovieFileUpload(e, true)} style={{ display: 'none' }} />
+                        </label>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end', marginTop: '4px' }}>
+                        <button onClick={() => setEditingPosterId(null)} className="btn-cinema" style={{ padding: '4px 8px', fontSize: '0.72rem' }}>İptal</button>
+                        <button onClick={() => handleSaveEditPoster(p.id)} className="btn-cinema primary" style={{ padding: '4px 12px', fontSize: '0.72rem' }}><Check size={12} /> Kaydet</button>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    /* Normal Poster Row */
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <img src={p.imageUrl} alt={p.title} style={{ width: '32px', height: '44px', objectFit: 'cover', borderRadius: '4px' }} />
+                        <div>
+                          <div style={{ fontSize: '0.85rem', fontWeight: 700 }}>{p.title}</div>
+                          <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <Calendar size={10} color="var(--accent-gold)" /> {p.releaseDate || 'Tarih Yok'} • {p.status || 'Yakında'}
+                          </div>
+                        </div>
+                      </div>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {p.status === 'Oynatılıyor' ? (
-                      <button
-                        onClick={() => handleEndSeance(p.id)}
-                        style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Square size={12} /> Seansı Bitir
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleStartSeance(p.id)}
-                        style={{ background: 'var(--cinema-red)', color: 'white', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                      >
-                        <Play size={12} /> Seansı Başlat
-                      </button>
-                    )}
-                    <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
-                  </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <button
+                          onClick={() => handleStartEditPoster(p)}
+                          title="Afişi Düzenle"
+                          style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--accent-gold)', border: 'none', borderRadius: '6px', padding: '5px 8px', fontSize: '0.75rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px' }}
+                        >
+                          <Edit2 size={12} /> Düzenle
+                        </button>
+
+                        {p.status === 'Oynatılıyor' ? (
+                          <button
+                            onClick={() => handleEndSeance(p.id)}
+                            style={{ background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Square size={12} /> Bitir
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleStartSeance(p.id)}
+                            style={{ background: 'var(--cinema-red)', color: 'white', border: 'none', borderRadius: '6px', padding: '5px 10px', fontSize: '0.75rem', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          >
+                            <Play size={12} /> Başlat
+                          </button>
+                        )}
+                        <button onClick={() => onDeleteMoviePoster(p.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -382,9 +505,48 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 3: USER MANAGEMENT */}
+        {/* TAB 3: USER MANAGEMENT & DYNAMIC CREDIT / MINUTE SETTINGS */}
         {activeTab === 'users' && (
           <div>
+            {/* Dynamic Loyalty Credit/Minute Settings Box */}
+            <form onSubmit={handleSaveCreditSettingsSubmit} style={{ background: 'rgba(251, 191, 36, 0.08)', border: '1px solid rgba(251, 191, 36, 0.3)', padding: '12px 14px', borderRadius: '12px', marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--accent-gold)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Clock size={15} /> ⏱️ Otomatik Kredi & İzleme Süresi Ayarları
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                <div>
+                  <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Kredi Periyodu (Dk)</label>
+                  <input
+                    type="number"
+                    value={settingIntervalMin}
+                    onChange={(e) => setSettingIntervalMin(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>Standart Kredi</label>
+                  <input
+                    type="number"
+                    value={settingStandardCred}
+                    onChange={(e) => setSettingStandardCred(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginBottom: '3px' }}>VIP Kredi</label>
+                  <input
+                    type="number"
+                    value={settingVipCred}
+                    onChange={(e) => setSettingVipCred(e.target.value)}
+                    style={{ width: '100%', background: 'rgba(0,0,0,0.6)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', padding: '6px', color: 'white', fontSize: '0.8rem' }}
+                  />
+                </div>
+              </div>
+              <button type="submit" className="btn-cinema primary" style={{ width: '100%', padding: '6px', fontSize: '0.75rem', justifyContent: 'center', background: 'linear-gradient(135deg, #d97706, #b45309)' }}>
+                Süre ve Kredi Kurallarını Güncelle
+              </button>
+            </form>
+
             <div style={{ marginBottom: '14px' }}>
               <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '6px', display: 'block' }}>
                 İşlem Yapılacak Kullanıcıyı Seçin:
@@ -449,7 +611,7 @@ export function AdminMasterPanelModal({
           </div>
         )}
 
-        {/* TAB 4: BUFFET ITEMS & EMOJI SELECTION */}
+        {/* TAB 4: BUFFET ITEMS & EDITING */}
         {activeTab === 'buffet' && (
           <div>
             <form onSubmit={handleAddBuffetSubmit} style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderRadius: '12px', marginBottom: '14px', border: '1px solid var(--bg-card-border)' }}>
@@ -469,7 +631,7 @@ export function AdminMasterPanelModal({
                 background: 'rgba(0,0,0,0.5)',
                 padding: '8px',
                 borderRadius: '8px',
-                maxHeight: '90px',
+                maxHeight: '80px',
                 overflowY: 'auto'
               }}>
                 {BUFFET_EMOJI_PALETTE.map(emoji => (
@@ -483,8 +645,7 @@ export function AdminMasterPanelModal({
                       border: buffetIcon === emoji ? '1px solid white' : 'none',
                       borderRadius: '6px',
                       padding: '4px',
-                      cursor: 'pointer',
-                      transition: 'transform 0.1s'
+                      cursor: 'pointer'
                     }}
                   >
                     {emoji}
@@ -504,11 +665,37 @@ export function AdminMasterPanelModal({
 
             <div style={{ maxHeight: '160px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {buffetItems.map(item => (
-                <div key={item.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
-                  <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <span style={{ fontSize: '1.2rem' }}>{item.icon}</span> {item.name} ({item.price} 🪙)
-                  </div>
-                  <button onClick={() => onDeleteBuffetItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={13} /></button>
+                <div key={item.id} style={{ padding: '6px 10px', background: 'rgba(255,255,255,0.03)', borderRadius: '6px' }}>
+                  {editingBuffetId === item.id ? (
+                    /* Inline Buffet Edit Form */
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '50px 1fr 70px', gap: '4px' }}>
+                        <input type="text" value={editBuffetIcon} onChange={(e) => setEditBuffetIcon(e.target.value)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '4px', color: 'white', textAlign: 'center' }} />
+                        <input type="text" value={editBuffetName} onChange={(e) => setEditBuffetName(e.target.value)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '4px', color: 'white', fontSize: '0.78rem' }} />
+                        <input type="number" value={editBuffetPrice} onChange={(e) => setEditBuffetPrice(e.target.value)} style={{ background: 'rgba(0,0,0,0.6)', border: '1px solid var(--accent-gold)', borderRadius: '4px', padding: '4px', color: 'white', fontSize: '0.78rem' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px', justifyContent: 'flex-end' }}>
+                        <button onClick={() => setEditingBuffetId(null)} className="btn-cinema" style={{ padding: '2px 6px', fontSize: '0.7rem' }}>İptal</button>
+                        <button onClick={() => handleSaveEditBuffet(item.id)} className="btn-cinema primary" style={{ padding: '2px 8px', fontSize: '0.7rem' }}><Check size={11} /> Kaydet</button>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Normal Buffet Item Row */
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span style={{ fontSize: '1.2rem' }}>{item.icon}</span> {item.name} ({item.price} 🪙)
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <button
+                          onClick={() => handleStartEditBuffet(item)}
+                          style={{ background: 'rgba(255,255,255,0.08)', color: 'var(--accent-gold)', border: 'none', borderRadius: '4px', padding: '3px 6px', fontSize: '0.7rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '2px' }}
+                        >
+                          <Edit2 size={11} /> Düzenle
+                        </button>
+                        <button onClick={() => onDeleteBuffetItem(item.id)} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -129,6 +129,16 @@ export default function App() {
     } catch (e) { return INITIAL_BUFFET_ITEMS; }
   });
 
+  // Dynamic Credit & Minute Reward Settings State
+  const [creditSettings, setCreditSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem('afk_credit_settings');
+      return saved ? JSON.parse(saved) : { intervalMinutes: 10, standardCredits: 20, vipCredits: 50 };
+    } catch (e) {
+      return { intervalMinutes: 10, standardCredits: 20, vipCredits: 50 };
+    }
+  });
+
   // Economy, VIP & Snacks State
   const [userCredits, setUserCredits] = useState(() => {
     try {
@@ -235,6 +245,10 @@ export default function App() {
   }, [buffetItems]);
 
   useEffect(() => {
+    localStorage.setItem('afk_credit_settings', JSON.stringify(creditSettings));
+  }, [creditSettings]);
+
+  useEffect(() => {
     localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
   }, [userCredits]);
 
@@ -255,18 +269,17 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // 10-Minute Seance Credit Loop: ONLY awarded if a movie seance is ACTIVE AND user is SEATED in the cinema!
+  // Dynamic Seance Credit Loop: Awarded based on Admin-configured minute interval & credit amounts ONLY when seance is ACTIVE AND user is SEATED!
   useEffect(() => {
+    const intervalMs = (creditSettings.intervalMinutes || 10) * 60 * 1000;
     const creditTimer = setInterval(() => {
       if (currentUser && !isAdmin) {
-        // Check if a seance is currently active
         const isSeanceActive = moviePosters.some(p => p.status === 'Oynatılıyor');
-        // Check if user is currently seated in a cinema seat
         const isUserSeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
 
         if (isSeanceActive && isUserSeated) {
           const isUserVip = vipUsers[currentUser.id];
-          const grantReward = isUserVip ? 50 : 20;
+          const grantReward = isUserVip ? creditSettings.vipCredits : creditSettings.standardCredits;
 
           setUserCredits(prev => {
             const currentBal = prev[currentUser.id] || 50;
@@ -276,18 +289,18 @@ export default function App() {
               id: 'sys_' + Date.now(),
               type: 'system',
               text: isUserVip
-                ? `⭐ VIP SEANS ÖDÜLÜ: Canlı seansı 10 dakika izlediğiniz için +50 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
-                : `🪙 SEANS ÖDÜLÜ: Canlı seansı 10 dakika izlediğiniz için +20 Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+                ? `⭐ VIP SEANS ÖDÜLÜ: Canlı seansı ${creditSettings.intervalMinutes} dakika izlediğiniz için +${grantReward} Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
+                : `🪙 SEANS ÖDÜLÜ: Canlı seansı ${creditSettings.intervalMinutes} dakika izlediğiniz için +${grantReward} Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
             }]);
 
             return { ...prev, [currentUser.id]: updatedBal };
           });
         }
       }
-    }, 10 * 60 * 1000);
+    }, intervalMs);
 
     return () => clearInterval(creditTimer);
-  }, [currentUser, isAdmin, vipUsers, moviePosters, seatedUsers]);
+  }, [currentUser, isAdmin, vipUsers, moviePosters, seatedUsers, creditSettings]);
 
   // 20-Minute Snack Auto-Expiry Cleanup Interval
   useEffect(() => {
@@ -629,8 +642,19 @@ export default function App() {
     setBuffetItems(prev => [...prev, item]);
   };
 
+  const handleUpdateBuffetItem = (itemId, updatedFields) => {
+    setBuffetItems(prev => prev.map(item => {
+      if (item.id === itemId) return { ...item, ...updatedFields };
+      return item;
+    }));
+  };
+
   const handleDeleteBuffetItem = (itemId) => {
     setBuffetItems(prev => prev.filter(i => i.id !== itemId));
+  };
+
+  const handleUpdateCreditSettings = (newSettings) => {
+    setCreditSettings(newSettings);
   };
 
   const handleAdminMoveUser = (userId, oldSeat, newSeat) => {
@@ -981,7 +1005,10 @@ export default function App() {
         onToggleVip={handleToggleVip}
         buffetItems={buffetItems}
         onAddBuffetItem={handleAddBuffetItem}
+        onUpdateBuffetItem={handleUpdateBuffetItem}
         onDeleteBuffetItem={handleDeleteBuffetItem}
+        creditSettings={creditSettings}
+        onUpdateCreditSettings={handleUpdateCreditSettings}
         isBroadcasting={!!broadcasterName}
         broadcasterName={broadcasterName}
         onStartBroadcast={() => {}}
