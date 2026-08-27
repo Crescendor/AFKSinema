@@ -252,28 +252,63 @@ export function LandingPage({
 
             {/* Discord OAuth Login Button */}
             {!currentUser && (
-              <button
-                type="button"
-                onClick={initiateDiscordLogin}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: '#ffffff',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '12px',
-                  boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
-                  padding: '12px 20px',
-                  fontSize: '0.9rem',
-                  fontWeight: 700,
-                  color: '#1e293b',
-                  cursor: 'pointer',
-                  marginTop: '6px'
-                }}
-              >
-                <DiscordIcon />
-                <span>continue with discord</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={initiateDiscordLogin}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '12px',
+                    boxShadow: '0 4px 14px rgba(0, 0, 0, 0.25)',
+                    padding: '12px 20px',
+                    fontSize: '0.9rem',
+                    fontWeight: 700,
+                    color: '#1e293b',
+                    cursor: 'pointer',
+                    marginTop: '6px'
+                  }}
+                >
+                  <DiscordIcon />
+                  <span>continue with discord</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const adminProfile = {
+                      id: '269639754675519489',
+                      username: 'Burak (Admin)',
+                      discriminator: '0',
+                      avatar: 'https://cdn.discordapp.com/embed/avatars/0.png',
+                      role: 'VIP Admin Streamer',
+                      badge: '👑 Admin',
+                      isAdmin: true
+                    };
+                    onLogin(adminProfile);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    background: 'rgba(255, 0, 0, 0.12)',
+                    border: '1px solid rgba(255, 0, 0, 0.35)',
+                    borderRadius: '12px',
+                    padding: '10px 16px',
+                    fontSize: '0.86rem',
+                    fontWeight: 800,
+                    color: 'var(--red-primary)',
+                    cursor: 'pointer',
+                    gap: '6px'
+                  }}
+                >
+                  <ShieldCheck size={16} />
+                  <span>👑 sistem admin girişi yap</span>
+                </button>
+              </>
             )}
           </div>
         )}
