@@ -1,12 +1,24 @@
 :root {
-  --bg-dark: #090406;
-  --bg-card: rgba(26, 12, 18, 0.85);
-  --bg-card-border: rgba(225, 29, 72, 0.18);
-  --bg-card-hover: rgba(38, 16, 25, 0.9);
+  --bg-site: #121212;
+  --bg-surface: #1c1c1c;
+  --bg-subtle: #242424;
 
-  --cinema-red: #e11d48;
-  --cinema-red-hover: #be123c;
-  --cinema-red-glow: rgba(225, 29, 72, 0.45);
+  --border-site: rgba(255, 255, 255, 0.1);
+  --border-dark: rgba(255, 255, 255, 0.2);
+  --border-red: #ff0000;
+
+  --text-main: #ffffff;
+  --text-muted: #94a3b8;
+  --text-subtle: #64748b;
+
+  --red-primary: #FF0000;
+  --red-hover: #e60000;
+  --red-dark: #800000;
+  --red-light: #ffe5e5;
+
+  --cinema-red: #FF0000;
+  --cinema-red-hover: #e60000;
+  --cinema-red-glow: rgba(255, 0, 0, 0.45);
   
   --discord-blurple: #5865F2;
   --discord-green: #23A55A;
@@ -17,16 +29,25 @@
   --accent-gold: #fbbf24;
   --accent-cyan: #06b6d4;
 
-  --text-main: #f8fafc;
-  --text-muted: #cbd5e1;
-  --text-dim: #94a3b8;
+  --bg-dark: #121212;
+  --bg-card: #1c1c1c;
+  --bg-card-border: rgba(255, 255, 255, 0.1);
+  --bg-card-hover: #242424;
 
-  --font-heading: 'Outfit', sans-serif;
-  --font-body: 'Inter', sans-serif;
+  --font-heading: 'Plus Jakarta Sans', 'Outfit', -apple-system, sans-serif;
+  --font-body: 'Plus Jakarta Sans', 'Inter', -apple-system, sans-serif;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --shadow-subtle: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --shadow-card: 0 12px 36px rgba(0, 0, 0, 0.6);
 
   --seat-empty: #240c14;
   --seat-empty-hover: #3d1522;
-  --seat-occupied: #e11d48;
+  --seat-occupied: #FF0000;
   --seat-mine: #10b981;
   --seat-vip: #854d0e;
   --seat-vip-occupied: #d97706;
@@ -39,12 +60,105 @@
 }
 
 body {
-  background-color: var(--bg-dark);
+  background-color: var(--bg-site);
   color: var(--text-main);
   font-family: var(--font-body);
   overflow-x: hidden;
   min-height: 100vh;
   user-select: none;
+}
+
+/* DoxCards Minimal Card */
+.minimal-card {
+  background: #1c1c1c;
+  border: 1px solid var(--border-site);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+}
+
+/* DoxCards Primary Red Button */
+.btn-primary {
+  background: #FF0000;
+  color: #ffffff;
+  height: 48px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
+  font-weight: 800;
+  font-size: 0.96rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-shadow: 0 4px 18px rgba(255, 0, 0, 0.45);
+  box-sizing: border-box;
+  vertical-align: middle;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: lowercase;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #e60000;
+  box-shadow: 0 6px 24px rgba(255, 0, 0, 0.65);
+  transform: translateY(-2px);
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* DoxCards Secondary Button */
+.btn-secondary {
+  background: #262626;
+  color: #ffffff;
+  border: 1px solid var(--border-site);
+  height: 48px;
+  min-height: 48px;
+  padding: 0 24px;
+  border-radius: var(--radius-md);
+  font-weight: 700;
+  font-size: 0.96rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  box-sizing: border-box;
+  vertical-align: middle;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  text-transform: lowercase;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #333333;
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-2px);
+}
+
+.btn-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: none;
+  transition: transform 0.15s, background 0.15s;
+}
+
+.btn-icon:hover {
+  background: rgba(255, 255, 255, 0.15);
+  transform: scale(1.08);
 }
 
 /* Custom Scrollbars */
@@ -56,7 +170,7 @@ body {
   background: rgba(10, 4, 7, 0.6);
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(225, 29, 72, 0.25);
+  background: rgba(255, 0, 0, 0.25);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
@@ -68,18 +182,18 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background: radial-gradient(circle at 50% 0%, #290a14 0%, #090406 75%);
+  background: var(--bg-site);
   transition: background 0.5s ease;
 }
 
 /* Dimmed Lights Cinema Mode */
 .app-container.lights-dimmed {
-  background: radial-gradient(circle at 50% 0%, #0c0205 0%, #020102 95%) !important;
+  background: #080305 !important;
 }
 
 .app-container.lights-dimmed .app-header {
-  background: rgba(4, 1, 2, 0.98) !important;
-  border-bottom-color: rgba(225, 29, 72, 0.08) !important;
+  background: rgba(12, 12, 12, 0.98) !important;
+  border-bottom-color: rgba(255, 0, 0, 0.1) !important;
 }
 
 .app-container.lights-dimmed .auditorium-container {
@@ -95,7 +209,7 @@ body {
 
 .app-container.lights-dimmed .discord-sidebar,
 .app-container.lights-dimmed .cinema-controls-deck {
-  background: rgba(5, 2, 4, 0.98) !important;
+  background: rgba(18, 18, 18, 0.98) !important;
   opacity: 0.35;
   transition: opacity 0.4s ease;
 }
@@ -103,20 +217,6 @@ body {
 .app-container.lights-dimmed .discord-sidebar:hover,
 .app-container.lights-dimmed .cinema-controls-deck:hover {
   opacity: 1;
-}
-
-.app-container.lights-dimmed .movie-billboard-left {
-  opacity: 0.2;
-  transition: opacity 0.4s ease;
-}
-
-.app-container.lights-dimmed .movie-billboard-left:hover {
-  opacity: 1;
-}
-
-.app-container.lights-dimmed .ambilight-glow {
-  opacity: 0.95;
-  filter: blur(55px);
 }
 
 .cinema-app-body {
@@ -131,9 +231,9 @@ body {
 /* Header Navbar */
 .app-header {
   height: 64px;
-  background: rgba(15, 6, 10, 0.9);
+  background: rgba(28, 28, 28, 0.95);
   backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--bg-card-border);
+  border-bottom: 1px solid var(--border-site);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -152,15 +252,15 @@ body {
 }
 
 .logo-badge {
-  background: linear-gradient(135deg, var(--cinema-red), #9f1239);
+  background: #FF0000;
   color: white;
   padding: 4px 10px;
   border-radius: 8px;
   font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  box-shadow: 0 0 12px var(--cinema-red-glow);
+  font-weight: 800;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 12px rgba(255, 0, 0, 0.45);
 }
 
 /* Cinema Hall Workspace */
@@ -181,7 +281,7 @@ body {
   top: 0;
   width: 70%;
   height: 380px;
-  background: conic-gradient(from 180deg at 50% 0%, rgba(225, 29, 72, 0.18) 0deg, rgba(255, 255, 255, 0.08) 30deg, transparent 60deg, transparent 300deg, rgba(255, 255, 255, 0.08) 330deg, rgba(225, 29, 72, 0.18) 360deg);
+  background: conic-gradient(from 180deg at 50% 0%, rgba(255, 0, 0, 0.18) 0deg, rgba(255, 255, 255, 0.08) 30deg, transparent 60deg, transparent 300deg, rgba(255, 255, 255, 0.08) 330deg, rgba(255, 0, 0, 0.18) 360deg);
   pointer-events: none;
   filter: blur(20px);
   z-index: 1;
@@ -204,7 +304,7 @@ body {
 .ambilight-glow {
   position: absolute;
   inset: -20px;
-  background: var(--ambilight-color, rgba(225, 29, 72, 0.4));
+  background: var(--ambilight-color, rgba(255, 0, 0, 0.4));
   filter: blur(45px);
   opacity: 0.6;
   border-radius: 24px;
@@ -219,7 +319,7 @@ body {
   aspect-ratio: 16 / 9;
   background: #000;
   border-radius: 12px;
-  border: 4px solid rgba(225, 29, 72, 0.3);
+  border: 4px solid rgba(255, 0, 0, 0.3);
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9), 0 0 35px var(--cinema-red-glow);
   overflow: hidden;
   z-index: 10;
@@ -231,7 +331,7 @@ body {
   left: 0;
   right: 0;
   height: 24px;
-  background: linear-gradient(to bottom, rgba(15, 4, 7, 0.95), transparent);
+  background: linear-gradient(to bottom, rgba(18, 18, 18, 0.95), transparent);
   z-index: 12;
   pointer-events: none;
 }
@@ -261,7 +361,7 @@ body {
   color: var(--text-muted);
   text-align: center;
   padding: 24px;
-  background: radial-gradient(circle at center, rgba(225, 29, 72, 0.18) 0%, rgba(9, 4, 6, 0.98) 75%);
+  background: radial-gradient(circle at center, rgba(255, 0, 0, 0.18) 0%, rgba(18, 18, 18, 0.98) 75%);
 }
 
 .screen-standby-icon {
@@ -282,7 +382,7 @@ body {
   width: 90%;
   height: 30px;
   margin: -10px auto 20px auto;
-  background: radial-gradient(ellipse at center, rgba(225, 29, 72, 0.25) 0%, transparent 70%);
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0.25) 0%, transparent 70%);
   border-radius: 50%;
   filter: blur(10px);
   z-index: 4;
@@ -318,7 +418,7 @@ body {
   font-family: var(--font-heading);
   font-size: 0.85rem;
   font-weight: 700;
-  color: var(--text-dim);
+  color: var(--text-subtle);
 }
 
 .row-label.right {
@@ -326,13 +426,13 @@ body {
   right: -32px;
 }
 
-/* Individual Crimson Velvet Cinema Seat */
+/* Individual Cinema Seat */
 .cinema-seat {
   position: relative;
   width: 48px;
   height: 48px;
-  background: linear-gradient(180deg, #3d1421 0%, #200810 100%);
-  border: 1px solid rgba(225, 29, 72, 0.25);
+  background: linear-gradient(180deg, #2b141c 0%, #17080e 100%);
+  border: 1px solid rgba(255, 0, 0, 0.25);
   border-radius: 10px 10px 6px 6px;
   cursor: pointer;
   display: flex;
@@ -346,12 +446,11 @@ body {
 
 .cinema-seat:hover {
   transform: translateY(-6deg) scale(1.1);
-  background: linear-gradient(180deg, #5c1b30 0%, #300c17 100%);
-  border-color: rgba(225, 29, 72, 0.6);
+  background: linear-gradient(180deg, #421827 0%, #240c14 100%);
+  border-color: rgba(255, 0, 0, 0.6);
   box-shadow: 0 10px 20px rgba(0, 0, 0, 0.8), 0 0 14px var(--cinema-red-glow);
 }
 
-/* Seat Armrests */
 .cinema-seat::before, .cinema-seat::after {
   content: '';
   position: absolute;
@@ -364,7 +463,6 @@ body {
 .cinema-seat::before { left: -3px; }
 .cinema-seat::after { right: -3px; }
 
-/* Seat Cushion Top */
 .seat-headrest {
   position: absolute;
   top: -6px;
@@ -375,7 +473,6 @@ body {
   border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-/* Seat States */
 .cinema-seat.vip {
   background: linear-gradient(180deg, #854d0e 0%, #451a03 100%);
   border-color: var(--accent-gold);
@@ -394,15 +491,8 @@ body {
   background: linear-gradient(180deg, #10b981 0%, #047857 100%);
   border-color: #34d399;
   box-shadow: 0 0 20px rgba(16, 185, 129, 0.7);
-  animation: pulseMySeat 2s infinite alternate;
 }
 
-@keyframes pulseMySeat {
-  0% { box-shadow: 0 0 12px rgba(16, 185, 129, 0.5); }
-  100% { box-shadow: 0 0 24px rgba(16, 185, 129, 0.9); }
-}
-
-/* Discord Avatar on Occupied Seat */
 .seat-avatar-wrapper {
   position: absolute;
   top: -14px;
@@ -412,7 +502,7 @@ body {
   border: 2px solid white;
   overflow: hidden;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.6);
-  background: #170a0e;
+  background: #1c1c1c;
 }
 
 .seat-avatar-img {
@@ -428,38 +518,11 @@ body {
   z-index: 2;
 }
 
-/* Floating Seat Tooltip */
-.seat-tooltip {
-  position: absolute;
-  bottom: 115%;
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  background: rgba(20, 8, 13, 0.95);
-  border: 1px solid var(--bg-card-border);
-  padding: 6px 12px;
-  border-radius: 8px;
-  white-space: nowrap;
-  font-size: 0.75rem;
-  pointer-events: none;
-  opacity: 0;
-  visibility: hidden;
-  transition: all 0.2s ease;
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.6);
-  z-index: 30;
-}
-
-.cinema-seat:hover .seat-tooltip {
-  opacity: 1;
-  visibility: visible;
-  transform: translateX(-50%) translateY(0);
-}
-
 /* Discord Sidebar (Right) */
 .discord-sidebar {
   width: 340px;
-  background: rgba(18, 8, 12, 0.95);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid var(--bg-card-border);
+  background: #1c1c1c;
+  border-left: 1px solid var(--border-site);
   display: flex;
   flex-direction: column;
   z-index: 40;
@@ -467,7 +530,7 @@ body {
 
 .sidebar-header {
   padding: 16px;
-  border-bottom: 1px solid var(--bg-card-border);
+  border-bottom: 1px solid var(--border-site);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -475,7 +538,7 @@ body {
 
 .sidebar-tab-btns {
   display: flex;
-  background: rgba(0, 0, 0, 0.4);
+  background: #121212;
   padding: 3px;
   border-radius: 8px;
   gap: 2px;
@@ -488,9 +551,10 @@ body {
   background: transparent;
   color: var(--text-muted);
   font-size: 0.8rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-transform: lowercase;
 }
 
 .sidebar-tab-btn.active {
@@ -528,7 +592,7 @@ body {
 }
 
 .chat-msg-user {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-main);
   display: flex;
   align-items: center;
@@ -537,7 +601,7 @@ body {
 }
 
 .chat-msg-seat-tag {
-  background: rgba(225, 29, 72, 0.2);
+  background: rgba(255, 0, 0, 0.2);
   color: var(--cinema-red);
   padding: 1px 6px;
   border-radius: 4px;
@@ -554,25 +618,24 @@ body {
 
 .chat-msg-system {
   font-size: 0.75rem;
-  color: var(--text-dim);
+  color: var(--text-subtle);
   text-align: center;
   background: rgba(255, 255, 255, 0.03);
   padding: 6px 12px;
   border-radius: 6px;
-  font-style: italic;
 }
 
 .chat-input-bar {
   padding: 16px;
-  border-top: 1px solid var(--bg-card-border);
+  border-top: 1px solid var(--border-site);
   display: flex;
   gap: 8px;
 }
 
 .chat-input {
   flex: 1;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid var(--bg-card-border);
+  background: #121212;
+  border: 1px solid var(--border-site);
   border-radius: 8px;
   padding: 8px 12px;
   color: white;
@@ -583,39 +646,13 @@ body {
   border-color: var(--cinema-red);
 }
 
-/* Floating Reactions */
-.floating-reaction {
-  position: absolute;
-  font-size: 2rem;
-  pointer-events: none;
-  animation: floatUp 2.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  z-index: 50;
-  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
-}
-
-@keyframes floatUp {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(0.6) rotate(0deg);
-  }
-  50% {
-    opacity: 0.9;
-    transform: translateY(-120px) scale(1.3) rotate(15deg);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-260px) scale(1) rotate(-15deg);
-  }
-}
-
 /* Control Bar Floating Deck */
 .cinema-controls-deck {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(20, 8, 13, 0.92);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--bg-card-border);
+  background: #1c1c1c;
+  border: 1px solid var(--border-site);
   padding: 8px 16px;
   border-radius: 50px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.7);
@@ -627,29 +664,30 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: rgba(255, 255, 255, 0.06);
+  background: #242424;
   color: var(--text-main);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-site);
   padding: 8px 16px;
   border-radius: 30px;
   font-size: 0.85rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
+  text-transform: lowercase;
 }
 
 .btn-cinema:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: #333333;
   transform: translateY(-2px);
 }
 
 .btn-cinema.primary {
-  background: linear-gradient(135deg, var(--cinema-red) 0%, #be123c 100%);
-  border-color: var(--cinema-red);
+  background: #FF0000;
+  border-color: #FF0000;
   box-shadow: 0 0 14px var(--cinema-red-glow);
 }
 .btn-cinema.primary:hover {
-  background: var(--cinema-red-hover);
+  background: #e60000;
   box-shadow: 0 0 20px var(--cinema-red-glow);
 }
 
@@ -657,8 +695,8 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.85);
-  backdrop-filter: blur(12px);
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(10px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -667,11 +705,21 @@ body {
 }
 
 .modal-card {
-  background: #170a0e;
-  border: 1px solid var(--bg-card-border);
-  border-radius: 20px;
+  background: #1c1c1c;
+  border: 1px solid var(--border-site);
+  border-radius: 24px;
   width: 100%;
   max-width: 480px;
-  padding: 24px;
-  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 30px var(--cinema-red-glow);
+  padding: 28px;
+  box-shadow: var(--shadow-card);
+  color: #ffffff;
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.96); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-pop {
+  animation: popIn 0.22s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }

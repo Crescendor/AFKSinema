@@ -9,9 +9,10 @@ import { CinemaBuffetModal } from './components/CinemaBuffetModal';
 import { MolaModal } from './components/MolaModal';
 import { UserProfileModal } from './components/UserProfileModal';
 import { LegalModal } from './components/LegalModal';
+import { LandingPage } from './components/LandingPage';
 import { MovieBillboardLeft } from './components/MovieBillboardLeft';
 import { InteractionsOverlay } from './components/InteractionsOverlay';
-import { LogIn, Coins, Shield } from 'lucide-react';
+import { LogIn, Coins, Shield, Copy, Check, Home, LogOut } from 'lucide-react';
 import { fetchDiscordUserProfile, exchangeCodeForUser, isAdminUser, initDiscordActivitySdk } from './utils/discordAuth';
 
 const ALL_SEAT_CODES = [
@@ -49,6 +50,24 @@ const INITIAL_MOVIE_POSTERS = [
 ];
 
 const SNACK_EXPIRY_MS = 20 * 60 * 1000;
+
+function generateRandomRoomCode() {
+  const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+  let code = '';
+  for (let i = 0; i < 5; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function getRoomCodeFromLocation() {
+  if (typeof window === 'undefined') return '';
+  const params = new URLSearchParams(window.location.search);
+  const qRoom = params.get('room') || params.get('join') || params.get('r');
+  if (qRoom) return qRoom.toLowerCase().trim();
+  const pathMatch = window.location.pathname.match(/^\/(?:room|join)\/([a-zA-Z0-9]{5})/i);
+  return pathMatch ? pathMatch[1].toLowerCase().trim() : '';
+}
 
 function findNearestFreeSeat(targetSeat, seatedMap, currentUserId) {
   if (!seatedMap || !seatedMap[targetSeat] || (currentUserId && seatedMap[targetSeat].id === currentUserId)) {
@@ -123,7 +142,7 @@ function BufeStandSide({ onOpenBuffet }) {
           width: '185px',
           height: 'auto',
           objectFit: 'contain',
-          filter: 'drop-shadow(0 0 20px rgba(225, 29, 72, 0.85)) drop-shadow(0 0 35px rgba(251, 191, 36, 0.6))'
+          filter: 'drop-shadow(0 0 20px rgba(255, 0, 0, 0.85)) drop-shadow(0 0 35px rgba(251, 191, 36, 0.6))'
         }}
       />
     </div>
@@ -131,6 +150,9 @@ function BufeStandSide({ onOpenBuffet }) {
 }
 
 export default function App() {
+  const [currentRoomCode, setCurrentRoomCode] = useState(() => getRoomCodeFromLocation());
+  const [copiedLink, setCopiedLink] = useState(false);
+
   const [currentUser, setCurrentUser] = useState(() => {
     try {
       const saved = localStorage.getItem('afk_current_user');
@@ -149,15 +171,7 @@ export default function App() {
     }
   });
 
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(() => {
-    try {
-      const savedUser = localStorage.getItem('afk_current_user');
-      return !savedUser;
-    } catch (e) {
-      return true;
-    }
-  });
-
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
   const [tempDiscordUser, setTempDiscordUser] = useState(null);
   const [messages, setMessages] = useState([]);
   const [broadcasterName, setBroadcasterName] = useState('');
@@ -188,8 +202,6 @@ export default function App() {
 
   const [targetSeatCode, setTargetSeatCode] = useState(null);
   const [activeReactions, setActiveReactions] = useState([]);
-
-  // Active Mola Intermission State
   const [activeMola, setActiveMola] = useState(null);
 
   // Admin Control Modal State
@@ -264,19 +276,19 @@ export default function App() {
   });
 
   const [userSnacks, setUserSnacks] = useState({});
-
-  // Seat Change Anti-Spam Tracker & Ban List
   const [seatChangeLimits, setSeatChangeLimits] = useState({});
   const [bannedUsers, setBannedUsers] = useState({});
 
   const isAdmin = isAdminUser(currentUser);
   const isVip = currentUser && (isAdmin || vipUsers[currentUser.id]);
 
-  // Refs for heartbeat — always have latest values without stale closures
   const currentUserRef = useRef(currentUser);
   const seatedUsersRef = useRef(seatedUsers);
+  const roomCodeRef = useRef(currentRoomCode);
+
   useEffect(() => { currentUserRef.current = currentUser; }, [currentUser]);
   useEffect(() => { seatedUsersRef.current = seatedUsers; }, [seatedUsers]);
+  useEffect(() => { roomCodeRef.current = currentRoomCode; }, [currentRoomCode]);
 
   // Discord Activity Embedded App SDK Auto-Login Effect
   useEffect(() => {
@@ -293,18 +305,18 @@ export default function App() {
     });
   }, []);
 
-  // Real-Time Multi-User Room Sync Polling (Every 2 seconds, GET also acts as presence heartbeat)
+  // Real-Time Multi-User Room Sync Polling
   useEffect(() => {
-    let seeded = false; // Seed D1 defaults once per session if it has no data yet
+    if (!currentRoomCode) return;
 
     const syncRoom = async () => {
       try {
-        // Build presence query params so GET doubles as heartbeat (no extra write needed)
         const user = currentUserRef.current;
         const seated = seatedUsersRef.current;
+        const roomCode = roomCodeRef.current || 'main';
         const mySeat = user ? Object.keys(seated).find(k => seated[k] && seated[k].id === user.id) : null;
 
-        const params = new URLSearchParams();
+        const params = new URLSearchParams({ code: roomCode });
         if (user && mySeat) {
           params.set('uid', user.id);
           params.set('seat', mySeat);
@@ -314,7 +326,6 @@ export default function App() {
         if (res.ok) {
           const room = await res.json();
 
-          // Sync & Deduplicate Seated Users in Real-Time across all clients
           if (room.userBadges && typeof room.userBadges === 'object') {
             setUserBadges(prev => JSON.stringify(prev) !== JSON.stringify(room.userBadges) ? room.userBadges : prev);
           }
@@ -333,82 +344,50 @@ export default function App() {
             });
           }
 
-          // Sync Chat Messages
           if (Array.isArray(room.messages)) {
             setMessages(prev => {
               return JSON.stringify(room.messages) !== JSON.stringify(prev) ? room.messages : prev;
             });
           }
 
-          // Sync Floating Reactions
           if (Array.isArray(room.reactions)) {
             const now = Date.now();
             const validReactions = room.reactions.filter(r => (now - r.timestamp) < 2500);
             setActiveReactions(prev => {
               const existingIds = new Set(prev.map(p => p.id));
               const newItems = validReactions.filter(r => !existingIds.has(r.id));
-              if (newItems.length > 0) {
-                return [...prev, ...newItems];
-              }
+              if (newItems.length > 0) return [...prev, ...newItems];
               return prev;
             });
           }
 
-          // Sync Active Mola
           if (room.activeMola !== undefined) {
             setActiveMola(room.activeMola);
           }
-
-          // Sync Movie Posters across all clients
           if (Array.isArray(room.moviePosters)) {
-            setMoviePosters(prev => {
-              return JSON.stringify(room.moviePosters) !== JSON.stringify(prev) ? room.moviePosters : prev;
-            });
+            setMoviePosters(prev => JSON.stringify(room.moviePosters) !== JSON.stringify(prev) ? room.moviePosters : prev);
           }
-
-          // Sync Buffet Items across all clients
           if (Array.isArray(room.buffetItems)) {
-            setBuffetItems(prev => {
-              return JSON.stringify(room.buffetItems) !== JSON.stringify(prev) ? room.buffetItems : prev;
-            });
-          } else if (!seeded) {
-            // D1 has no buffetItems yet — seed it with the local defaults so all users see the same list
-            seeded = true;
-            const localItems = JSON.parse(localStorage.getItem('afk_buffet_items') || 'null') || INITIAL_BUFFET_ITEMS;
-            fetch('/api/room', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: localItems } })
-            }).catch(() => {});
+            setBuffetItems(prev => JSON.stringify(room.buffetItems) !== JSON.stringify(prev) ? room.buffetItems : prev);
           }
-
-          if (room.broadcasterName !== undefined) {
-            setBroadcasterName(room.broadcasterName);
-          }
-          if (room.broadcasterPeerId !== undefined) {
-            setBroadcasterPeerId(room.broadcasterPeerId || '');
-          }
-          if (room.streamUrl !== undefined) {
-            setStreamUrl(room.streamUrl || '');
-          }
+          if (room.broadcasterName !== undefined) setBroadcasterName(room.broadcasterName);
+          if (room.broadcasterPeerId !== undefined) setBroadcasterPeerId(room.broadcasterPeerId || '');
+          if (room.streamUrl !== undefined) setStreamUrl(room.streamUrl || '');
         }
-      } catch (err) {
-        // Fallback for local dev
-      }
+      } catch (err) {}
     };
 
     syncRoom();
     const interval = setInterval(syncRoom, 2000);
     return () => clearInterval(interval);
-  }, []);
+  }, [currentRoomCode]);
 
-
-  // Tab Close: notify server when user leaves (sendBeacon is fire-and-forget)
   useEffect(() => {
     const handleLeave = () => {
       const user = currentUserRef.current;
+      const roomCode = roomCodeRef.current || 'main';
       if (!user) return;
-      const payload = JSON.stringify({ action: 'LEAVE_ROOM', data: { userId: user.id } });
+      const payload = JSON.stringify({ roomCode, action: 'LEAVE_ROOM', data: { userId: user.id } });
       if (navigator.sendBeacon) navigator.sendBeacon('/api/room', payload);
     };
     window.addEventListener('beforeunload', handleLeave);
@@ -420,135 +399,52 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (currentUser) {
-      localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
-    } else {
-      localStorage.removeItem('afk_current_user');
-    }
+    if (currentUser) localStorage.setItem('afk_current_user', JSON.stringify(currentUser));
+    else localStorage.removeItem('afk_current_user');
   }, [currentUser]);
 
-  useEffect(() => {
-    localStorage.setItem('afk_seated_users', JSON.stringify(seatedUsers));
-  }, [seatedUsers]);
+  useEffect(() => { localStorage.setItem('afk_seated_users', JSON.stringify(seatedUsers)); }, [seatedUsers]);
+  useEffect(() => { localStorage.setItem('afk_buffet_items', JSON.stringify(buffetItems)); }, [buffetItems]);
+  useEffect(() => { localStorage.setItem('afk_credit_settings', JSON.stringify(creditSettings)); }, [creditSettings]);
+  useEffect(() => { localStorage.setItem('afk_user_credits', JSON.stringify(userCredits)); }, [userCredits]);
+  useEffect(() => { localStorage.setItem('afk_vip_users', JSON.stringify(vipUsers)); }, [vipUsers]);
+  useEffect(() => { localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters)); }, [moviePosters]);
+  useEffect(() => { localStorage.setItem('afk_hidden_badges', JSON.stringify(hiddenBadges)); }, [hiddenBadges]);
 
-  useEffect(() => {
-    localStorage.setItem('afk_buffet_items', JSON.stringify(buffetItems));
-  }, [buffetItems]);
+  const handleCreateRoom = (user) => {
+    const code = generateRandomRoomCode();
+    setCurrentRoomCode(code);
+    window.history.pushState(null, '', `/?room=${code}`);
+    if (user) setCurrentUser(user);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('afk_credit_settings', JSON.stringify(creditSettings));
-  }, [creditSettings]);
+  const handleJoinRoom = (code, user) => {
+    const cleanCode = code.toLowerCase().trim();
+    setCurrentRoomCode(cleanCode);
+    window.history.pushState(null, '', `/?room=${cleanCode}`);
+    if (user) setCurrentUser(user);
+  };
 
-  useEffect(() => {
-    localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
-  }, [userCredits]);
-
-  useEffect(() => {
-    localStorage.setItem('afk_vip_users', JSON.stringify(vipUsers));
-  }, [vipUsers]);
-
-  useEffect(() => {
-    localStorage.setItem('afk_movie_posters', JSON.stringify(moviePosters));
-  }, [moviePosters]);
-
-  useEffect(() => {
-    localStorage.setItem('afk_hidden_badges', JSON.stringify(hiddenBadges));
-  }, [hiddenBadges]);
-
-  useEffect(() => {
-    localStorage.setItem('afk_user_credits', JSON.stringify(userCredits));
-  }, [userCredits]);
-
-
-  // Dynamic Seance Credit Loop: Awarded based on Admin-configured minute interval & credit amounts ONLY when seance is ACTIVE AND user is SEATED!
-  useEffect(() => {
-    const intervalMs = (creditSettings.intervalMinutes || 10) * 60 * 1000;
-    const creditTimer = setInterval(() => {
-      if (currentUser && !isAdmin) {
-        const isSeanceActive = moviePosters.some(p => p.status === 'Oynatılıyor');
-        const isUserSeated = Object.values(seatedUsers).some(u => u.id === currentUser.id);
-
-        if (isSeanceActive && isUserSeated) {
-          const isUserVip = vipUsers[currentUser.id];
-          const grantReward = isUserVip ? creditSettings.vipCredits : creditSettings.standardCredits;
-
-          setUserCredits(prev => {
-            const currentBal = prev[currentUser.id] || 50;
-            const updatedBal = currentBal + grantReward;
-            
-            setMessages(prevMsgs => [...prevMsgs, {
-              id: 'sys_' + Date.now(),
-              type: 'system',
-              text: isUserVip
-                ? `⭐ VIP SEANS ÖDÜLÜ: Canlı seansı ${creditSettings.intervalMinutes} dakika izlediğiniz için +${grantReward} Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
-                : `🪙 SEANS ÖDÜLÜ: Canlı seansı ${creditSettings.intervalMinutes} dakika izlediğiniz için +${grantReward} Kredi kazandınız! (Mevcut: ${updatedBal} Kredi)`
-            }]);
-
-            return { ...prev, [currentUser.id]: updatedBal };
-          });
-        }
-      }
-    }, intervalMs);
-
-    return () => clearInterval(creditTimer);
-  }, [currentUser, isAdmin, vipUsers, moviePosters, seatedUsers, creditSettings]);
-
-  // 20-Minute Snack Auto-Expiry Cleanup Interval
-  useEffect(() => {
-    const expiryInterval = setInterval(() => {
-      const now = Date.now();
-      setUserSnacks(prev => {
-        let changed = false;
-        const updated = { ...prev };
-
-        Object.entries(updated).forEach(([userId, slots]) => {
-          const newSlots = { ...slots };
-          if (newSlots.left && (now > newSlots.left.expireTime || newSlots.left.bitesLeft <= 0)) {
-            newSlots.left = null;
-            changed = true;
-          }
-          if (newSlots.right && (now > newSlots.right.expireTime || newSlots.right.bitesLeft <= 0)) {
-            newSlots.right = null;
-            changed = true;
-          }
-          updated[userId] = newSlots;
-        });
-
-        return changed ? updated : prev;
-      });
-    }, 10000);
-
-    return () => clearInterval(expiryInterval);
-  }, []);
-
-  // Check URL Search Params for ?code= OR Hash for #access_token=
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const code = searchParams.get('code');
-    const hash = window.location.hash;
-
-    if (code) {
-      exchangeCodeForUser(code).then((profile) => {
-        if (profile) {
-          setTempDiscordUser(profile);
-          setIsLoginModalOpen(true);
-        }
-        window.history.replaceState(null, '', '/sinema');
-      });
-    } else if (hash && hash.includes('access_token')) {
-      const params = new URLSearchParams(hash.substring(1));
-      const token = params.get('access_token');
-      if (token) {
-        fetchDiscordUserProfile(token).then((profile) => {
-          if (profile) {
-            setTempDiscordUser(profile);
-            setIsLoginModalOpen(true);
-          }
-          window.history.replaceState(null, '', '/sinema');
-        });
-      }
+  const handleLeaveRoomToLanding = () => {
+    if (currentUser) {
+      fetch('/api/room', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'LEAVE_ROOM', data: { userId: currentUser.id } })
+      }).catch(() => {});
     }
-  }, []);
+    setCurrentRoomCode('');
+    setSeatedUsers({});
+    setMessages([]);
+    window.history.pushState(null, '', '/');
+  };
+
+  const handleCopyRoomLink = () => {
+    const link = `${window.location.origin}/?room=${currentRoomCode}`;
+    navigator.clipboard.writeText(link);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
 
   const handleSelectSeat = (seatCode) => {
     if (!currentUser) {
@@ -557,32 +453,7 @@ export default function App() {
       return;
     }
 
-    const userBan = bannedUsers[currentUser.id];
-    if (userBan && (userBan.isPerm || Date.now() < userBan.until)) {
-      alert('⛔ SİNEMADAN UZAKLAŞTIRILDINIZ: Bu sinema salonundan uzaklaştırıldınız.');
-      return;
-    }
-
-    if (!isAdmin) {
-      const userId = currentUser.id;
-      const now = Date.now();
-      const userLimit = seatChangeLimits[userId] || { count: 0, resetTime: now + (10 * 60 * 1000) };
-
-      if (now > userLimit.resetTime) {
-        seatChangeLimits[userId] = { count: 1, resetTime: now + (10 * 60 * 1000) };
-      } else {
-        if (userLimit.count >= 10) {
-          const remainingMinutes = Math.ceil((userLimit.resetTime - now) / (60 * 1000));
-          alert(`⏱️ KOLTUK DEĞİŞTİRME LİMİTİ:\nÇok fazla koltuk değiştirdiniz! 10 dakikada en fazla 10 kez koltuk değiştirebilirsiniz.\nYenilenmesine kalan süre: ${remainingMinutes} dakika.`);
-          return;
-        }
-        seatChangeLimits[userId] = { count: userLimit.count + 1, resetTime: userLimit.resetTime };
-      }
-      setSeatChangeLimits({ ...seatChangeLimits });
-    }
-
     const actualSeatCode = findNearestFreeSeat(seatCode, seatedUsers, currentUser.id);
-
     const updated = {};
     Object.entries(seatedUsers).forEach(([code, u]) => {
       if (u.id !== currentUser.id) updated[code] = u;
@@ -595,65 +466,24 @@ export default function App() {
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: actualSeatCode, user: currentUser } })
+      body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'SEAT_OCCUPY', data: { seatCode: actualSeatCode, user: currentUser } })
     }).catch(() => {});
 
     const wasRelocated = actualSeatCode !== seatCode;
-    const newMsg = {
+    setMessages(prev => [...prev, {
       id: 'sys_' + Date.now(),
       type: 'system',
       text: wasRelocated
         ? `${currentUser.username} ${seatCode} koltuğu dolu olduğu için en yakın ${actualSeatCode} koltuğuna oturtuldu 🪑`
         : `${currentUser.username} ${actualSeatCode} koltuğuna oturdu 🍿`
-    };
-    setMessages(prev => [...prev, newMsg]);
+    }]);
   };
 
   const handleLogin = (finalUser) => {
-    const userBan = bannedUsers[finalUser.id];
-    if (userBan && (userBan.isPerm || Date.now() < userBan.until)) {
-      alert('⛔ UZAKLAŞTIRILDINIZ: Bu kullanıcı sinema salonundan uzaklaştırılmıştır.');
-      return;
-    }
-
     setCurrentUser(finalUser);
     setIsLoginModalOpen(false);
-    window.history.replaceState(null, '', '/sinema');
-
     if (!userCredits[finalUser.id]) {
       setUserCredits(prev => ({ ...prev, [finalUser.id]: 50 }));
-    }
-
-    // Eğer kullanıcı giriş yapmadan önce bir koltuğa tıkladıysa, o koltuğa oturt
-    if (targetSeatCode) {
-      const actualSeat = findNearestFreeSeat(targetSeatCode, seatedUsers, finalUser.id);
-      const updated = {};
-      Object.entries(seatedUsers).forEach(([code, u]) => {
-        if (u.id !== finalUser.id) updated[code] = u;
-      });
-      updated[actualSeat] = finalUser;
-      setSeatedUsers(sanitizeSeatedUsers(updated));
-
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: actualSeat, user: finalUser } })
-      }).catch(() => {});
-
-      setMessages(prev => [...prev, {
-        id: 'sys_' + Date.now(),
-        type: 'system',
-        text: `${finalUser.username} salona katıldı ve ${actualSeat} koltuğuna oturdu 🍿`
-      }]);
-
-      setTargetSeatCode(null);
-    } else {
-      // Koltuk seçimi yapılmamış — sadece salona katıldı mesajı
-      setMessages(prev => [...prev, {
-        id: 'sys_' + Date.now(),
-        type: 'system',
-        text: `${finalUser.username} salona katıldı 🎬`
-      }]);
     }
   };
 
@@ -665,336 +495,41 @@ export default function App() {
     setSeatedUsers(prev => {
       const updated = { ...prev };
       Object.entries(updated).forEach(([code, u]) => {
-        if (u.id === currentUser.id) {
-          updated[code] = updatedUser;
-        }
+        if (u.id === currentUser.id) updated[code] = updatedUser;
       });
       return sanitizeSeatedUsers(updated);
-    });
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `✏️ ${currentUser.username} ismini "${newNickname}" olarak değiştirdi.`
-    }]);
-  };
-
-  const handleToggleHideBadge = (badgeKey) => {
-    setHiddenBadges(prev => {
-      const updated = { ...prev, [badgeKey]: !prev[badgeKey] };
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_STATE', data: { hiddenBadges: updated } })
-      }).catch(() => {});
-      return updated;
     });
   };
 
   const handleLogout = () => {
     if (currentUser) {
-      const userId = currentUser.id;
       fetch('/api/room', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'LEAVE_ROOM', data: { userId } })
+        body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'LEAVE_ROOM', data: { userId: currentUser.id } })
       }).catch(() => {});
-
-      setSeatedUsers(prev => {
-        const updated = { ...prev };
-        Object.entries(updated).forEach(([code, u]) => {
-          if (u.id === userId) delete updated[code];
-        });
-        return sanitizeSeatedUsers(updated);
-      });
     }
-
     setCurrentUser(null);
     localStorage.removeItem('afk_current_user');
     setIsProfileModalOpen(false);
-    setIsLoginModalOpen(true);
   };
 
   const handleBuySnack = (userId, item) => {
     if (!isAdmin) {
-      setUserCredits(prev => ({
-        ...prev,
-        [userId]: (prev[userId] || 50) - item.price
-      }));
+      setUserCredits(prev => ({ ...prev, [userId]: (prev[userId] || 50) - item.price }));
     }
-
     const expireTime = Date.now() + SNACK_EXPIRY_MS;
-    const initialBites = 20;
-
     setUserSnacks(prev => {
       const existing = prev[userId] || { left: null, right: null };
       const isLeftEmpty = !existing.left || Date.now() > existing.left.expireTime || existing.left.bitesLeft <= 0;
       const targetSlot = isLeftEmpty ? 'left' : 'right';
-
       return {
         ...prev,
         [userId]: {
           ...existing,
-          [targetSlot]: { icon: item.icon, expireTime, bitesLeft: initialBites }
+          [targetSlot]: { icon: item.icon, expireTime, bitesLeft: 20 }
         }
       };
-    });
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `🍿 BÜFE: ${currentUser.username} büfeden ${item.name} (${item.icon}) aldı! (20 Yeme veya 20 Dk Süreli)`
-    }]);
-  };
-
-  const handleConsumePopcorn = () => {
-    if (!currentUser) return;
-    const userId = currentUser.id;
-
-    setUserSnacks(prev => {
-      const existing = prev[userId] || { left: null, right: null };
-      let newLeft = existing.left ? { ...existing.left } : null;
-      let newRight = existing.right ? { ...existing.right } : null;
-
-      const isPopcorn = (icon) => icon === '🍿' || icon === '👑';
-
-      if (newLeft && isPopcorn(newLeft.icon)) {
-        const remaining = (newLeft.bitesLeft ?? 20) - 1;
-        if (remaining <= 0) {
-          newLeft = null;
-        } else {
-          newLeft.bitesLeft = remaining;
-        }
-      } else if (newRight && isPopcorn(newRight.icon)) {
-        const remaining = (newRight.bitesLeft ?? 20) - 1;
-        if (remaining <= 0) {
-          newRight = null;
-        } else {
-          newRight.bitesLeft = remaining;
-        }
-      }
-
-      return {
-        ...prev,
-        [userId]: { left: newLeft, right: newRight }
-      };
-    });
-  };
-
-  // APPEND NEW POSTERS TO THE BOTTOM OF THE LIST AND SYNC
-  const handleAddMoviePoster = (newPoster) => {
-    setMoviePosters(prev => {
-      const updated = [...prev, newPoster];
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updated } })
-      }).catch(() => {});
-      return updated;
-    });
-  };
-
-  const handleUpdateMoviePosters = (updatedPosters) => {
-    setMoviePosters(updatedPosters);
-    fetch('/api/room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updatedPosters } })
-    }).catch(() => {});
-  };
-
-  const handleDeleteMoviePoster = (posterId) => {
-    setMoviePosters(prev => {
-      const updated = prev.filter(p => p.id !== posterId);
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_POSTERS', data: { moviePosters: updated } })
-      }).catch(() => {});
-      return updated;
-    });
-  };
-
-  const handleStartMola = (molaTitle) => {
-    const newMola = { title: molaTitle, startTime: Date.now() };
-    setActiveMola(newMola);
-
-    fetch('/api/room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'UPDATE_MOLA', data: { activeMola: newMola } })
-    }).catch(() => {});
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `☕ MOLA BAŞLADI: Admin "${molaTitle}" başlattı!`
-    }]);
-  };
-
-  const handleEndMola = () => {
-    setActiveMola(null);
-    fetch('/api/room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'UPDATE_MOLA', data: { activeMola: null } })
-    }).catch(() => {});
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `🎬 MOLA BİTTİ: Sinema yayını devam ediyor!`
-    }]);
-  };
-
-  const handleToggleVip = (userId) => {
-    setVipUsers(prev => ({
-      ...prev,
-      [userId]: !prev[userId]
-    }));
-  };
-
-  const handleGrantCredits = (userId, amount) => {
-    let newTotal = 50;
-    setUserCredits(prev => {
-      newTotal = (prev[userId] || 50) + amount;
-      const updated = { ...prev, [userId]: newTotal };
-      localStorage.setItem('afk_user_credits', JSON.stringify(updated));
-
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_STATE', data: { userCredits: updated } })
-      }).catch(() => {});
-
-      return updated;
-    });
-
-    const targetUserObj = Object.values(seatedUsers).find(u => u && u.id === userId);
-    const targetName = targetUserObj ? targetUserObj.username : 'Kullanıcı';
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `🎉 ${targetName} hesabına +${amount} 🪙 Kredi yüklendi! (Güncel Bakiye: ${newTotal} 🪙)`
-    }]);
-  };
-
-  const handleAddBuffetItem = (item) => {
-    setBuffetItems(prev => {
-      const updated = [...prev, item];
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
-      }).catch(() => {});
-      return updated;
-    });
-  };
-
-  const handleUpdateBuffetItem = (itemId, updatedFields) => {
-    setBuffetItems(prev => {
-      const updated = prev.map(item => {
-        if (item.id === itemId) return { ...item, ...updatedFields };
-        return item;
-      });
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
-      }).catch(() => {});
-      return updated;
-    });
-  };
-
-  const handleDeleteBuffetItem = (itemId) => {
-    setBuffetItems(prev => {
-      const updated = prev.filter(i => i.id !== itemId);
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'UPDATE_BUFFET', data: { buffetItems: updated } })
-      }).catch(() => {});
-      return updated;
-    });
-  };
-
-  const handleUpdateCreditSettings = (newSettings) => {
-    setCreditSettings(newSettings);
-  };
-
-  const handleAdminMoveUser = (userId, oldSeat, newSeat) => {
-    const updated = { ...seatedUsers };
-    const targetUserObj = updated[oldSeat];
-    if (targetUserObj) {
-      delete updated[oldSeat];
-      updated[newSeat] = targetUserObj;
-      const sanitized = sanitizeSeatedUsers(updated);
-      setSeatedUsers(sanitized);
-
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SEAT_OCCUPY', data: { seatCode: newSeat, user: targetUserObj } })
-      }).catch(() => {});
-
-      setMessages(prev => [...prev, {
-        id: 'sys_' + Date.now(),
-        type: 'system',
-        text: `👑 Admin ${targetUserObj.username} kullanıcısını ${oldSeat} koltuğundan ${newSeat} koltuğuna taşıdı.`
-      }]);
-    }
-  };
-
-  const handleAdminKickUser = (targetUser, durationMinutes, isPerm) => {
-    const userId = targetUser.id;
-    const until = isPerm ? 0 : Date.now() + (durationMinutes * 60 * 1000);
-
-    setBannedUsers(prev => ({
-      ...prev,
-      [userId]: { isPerm, until }
-    }));
-
-    const updated = { ...seatedUsers };
-    Object.entries(updated).forEach(([code, u]) => {
-      if (u.id === userId) delete updated[code];
-    });
-    setSeatedUsers(sanitizeSeatedUsers(updated));
-
-    fetch('/api/room', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'LEAVE_ROOM', data: { userId } })
-    }).catch(() => {});
-
-    if (currentUser && currentUser.id === userId) {
-      setCurrentUser(null);
-      localStorage.removeItem('afk_current_user');
-      setIsLoginModalOpen(true);
-    }
-
-    setMessages(prev => [...prev, {
-      id: 'sys_' + Date.now(),
-      type: 'system',
-      text: `⛔ Admin ${targetUser.username} kullanıcısını ${isPerm ? 'sınırsız banladı' : `${durationMinutes} dakikalığına salondan attı`}.`
-    }]);
-  };
-
-  const handleUpdateUserBadge = (userId, badgeObj) => {
-    setUserBadges(prev => {
-      const updated = { ...prev };
-      if (!badgeObj || (!badgeObj.text && !badgeObj.emoji)) {
-        delete updated[userId];
-      } else {
-        updated[userId] = badgeObj;
-      }
-      localStorage.setItem('afk_user_badges', JSON.stringify(updated));
-      fetch('/api/room', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'SYNC_STATE', data: { userBadges: updated } })
-      }).catch(() => {});
-      return updated;
     });
   };
 
@@ -1003,26 +538,23 @@ export default function App() {
       setIsLoginModalOpen(true);
       return;
     }
-
     let mySeat = null;
     Object.entries(seatedUsers).forEach(([code, u]) => {
       if (u.id === currentUser.id) mySeat = code;
     });
 
-    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     const msg = {
       id: 'msg_' + Date.now(),
       user: currentUser,
       seatCode: mySeat,
-      time: timeStr,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       ...msgData
     };
 
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SEND_CHAT', data: msg })
+      body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'SEND_CHAT', data: msg })
     }).catch(() => {});
 
     setMessages(prev => [...prev, msg]);
@@ -1032,15 +564,13 @@ export default function App() {
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'DELETE_CHAT', data: { msgId } })
+      body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'DELETE_CHAT', data: { msgId } })
     }).catch(() => {});
-
     setMessages(prev => prev.filter(m => m.id !== msgId));
   };
 
   const handleTriggerReaction = (emoji) => {
     let mySeatCode = null;
-
     if (currentUser) {
       Object.entries(seatedUsers).forEach(([code, u]) => {
         if (u.id === currentUser.id) mySeatCode = code;
@@ -1060,7 +590,7 @@ export default function App() {
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SEND_REACTION', data: newReaction })
+      body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'SEND_REACTION', data: newReaction })
     }).catch(() => {});
 
     setTimeout(() => {
@@ -1074,7 +604,6 @@ export default function App() {
     setIsAdminModalOpen(true);
   };
 
-  // Set/clear the stream URL and sync to D1 for all users
   const handleSetStreamUrl = (url, broadcasterDisplayName) => {
     const safeUrl = url || '';
     const safeName = broadcasterDisplayName || '';
@@ -1083,7 +612,7 @@ export default function App() {
     fetch('/api/room', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'SYNC_STATE', data: { streamUrl: safeUrl, broadcasterName: safeName, broadcasterPeerId: '' } })
+      body: JSON.stringify({ roomCode: currentRoomCode || 'main', action: 'SYNC_STATE', data: { streamUrl: safeUrl, broadcasterName: safeName, broadcasterPeerId: '' } })
     }).catch(() => {});
   };
 
@@ -1102,47 +631,92 @@ export default function App() {
 
   const availableSeats = ALL_SEAT_CODES.filter(code => !seatedUsers[code]);
   const currentCreditBalance = currentUser ? (isAdmin ? '∞' : (userCredits[currentUser.id] || 50)) : 0;
-  const mySnacks = currentUser ? (userSnacks[currentUser.id] || {}) : {};
+
+  // IF NO ROOM CODE SELECTED, RENDER DOXCARDS LANDING PAGE!
+  if (!currentRoomCode) {
+    return (
+      <LandingPage
+        currentUser={currentUser}
+        onLogin={handleLogin}
+        onLogout={handleLogout}
+        onCreateRoom={handleCreateRoom}
+        onJoinRoom={handleJoinRoom}
+        onOpenAdmin={() => setIsAdminMasterOpen(true)}
+        urlRoomCode={getRoomCodeFromLocation()}
+        isLoading={false}
+      />
+    );
+  }
 
   return (
     <div className={`app-container ${lightsDimmed ? 'lights-dimmed' : ''}`}>
-      {/* Header */}
+      {/* Sleek DoxCards-styled Cinema Header */}
       <header className="app-header">
-        <div className="logo-section">
-          <img src="/afk_logo.png" alt="AFK Sinema Logo" style={{ height: '36px', borderRadius: '8px', border: '1px solid rgba(225,29,72,0.4)' }} />
-          <span style={{ background: 'linear-gradient(135deg, #fff, #94a3b8)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
-            AFK<span style={{ color: 'var(--cinema-red)', WebkitTextFillColor: 'var(--cinema-red)' }}>Sinema</span>
+        <div className="logo-section" style={{ cursor: 'pointer' }} onClick={handleLeaveRoomToLanding}>
+          <img src="/afk_logo.png" alt="AFK Sinema Logo" style={{ height: '34px', borderRadius: '8px', border: '1px solid var(--border-site)' }} />
+          <span>
+            afk<span style={{ color: 'var(--red-primary)' }}>sinema</span>
           </span>
-          <span className="logo-badge">Discord Cinema</span>
+          <span className="logo-badge">room</span>
+        </div>
+
+        {/* Room Code Badge & Share Link */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          background: '#121212',
+          border: '1px solid var(--border-site)',
+          padding: '6px 14px',
+          borderRadius: '20px'
+        }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 700 }}>oda koda:</span>
+          <span style={{ fontFamily: 'monospace', fontSize: '0.95rem', fontWeight: 900, color: '#ffffff', letterSpacing: '0.1em' }}>
+            {currentRoomCode.toUpperCase()}
+          </span>
+          <button
+            onClick={handleCopyRoomLink}
+            style={{ background: 'none', border: 'none', color: copiedLink ? '#10b981' : 'var(--text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            title="Oda Davet Linkini Kopyala"
+          >
+            {copiedLink ? <Check size={15} color="#10b981" /> : <Copy size={15} />}
+          </button>
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          {/* Top-Right Master Admin Panel Button */}
+          <button
+            className="btn-secondary"
+            onClick={handleLeaveRoomToLanding}
+            style={{ padding: '6px 12px', fontSize: '0.78rem', height: '36px', minHeight: '36px' }}
+            title="Sinema Salonundan Çık / Ana Menü"
+          >
+            <Home size={15} /> salondan çık
+          </button>
+
           {isAdmin && (
             <button
-              className="btn-cinema"
+              className="btn-primary"
               onClick={() => setIsAdminMasterOpen(true)}
-              style={{ padding: '6px 14px', fontSize: '0.82rem', background: 'linear-gradient(135deg, #fbbf24, #d97706)', color: 'black', fontWeight: 800, border: 'none' }}
+              style={{ padding: '6px 14px', fontSize: '0.78rem', height: '36px', minHeight: '36px' }}
             >
-              <Shield size={16} color="black" /> 👑 Admin Paneli
+              <Shield size={15} /> admin paneli
             </button>
           )}
 
-          {/* Credit Balance Badge */}
           {currentUser && (
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
-              background: 'rgba(251, 191, 36, 0.15)',
-              border: '1px solid rgba(251, 191, 36, 0.4)',
+              background: 'rgba(251, 191, 36, 0.12)',
+              border: '1px solid rgba(251, 191, 36, 0.3)',
               padding: '6px 12px',
               borderRadius: '20px',
               fontSize: '0.82rem',
               fontWeight: 800,
               color: 'var(--accent-gold)'
             }}>
-              <Coins size={16} /> {currentCreditBalance} Kredi
+              <Coins size={15} /> {currentCreditBalance} Kredi
             </div>
           )}
 
@@ -1153,25 +727,20 @@ export default function App() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: '10px',
-                background: isVip ? 'rgba(251, 191, 36, 0.18)' : 'rgba(225, 29, 72, 0.15)',
-                border: `1px solid ${isVip ? 'var(--accent-gold)' : 'rgba(225, 29, 72, 0.4)'}`,
+                background: '#121212',
+                border: '1px solid var(--border-site)',
                 padding: '4px 12px',
                 borderRadius: '30px',
                 cursor: 'pointer'
               }}
-              title="Profil Ayarları & Çıkış"
+              title="Profil Ayarları"
             >
               <img src={currentUser.avatar} alt={currentUser.username} style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }} />
               <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'white' }}>{currentUser.username}</span>
-              {isVip && (
-                <span style={{ fontSize: '0.7rem', background: 'var(--accent-gold)', color: 'black', padding: '1px 6px', borderRadius: '4px', fontWeight: 800 }}>
-                  {isAdmin ? '👑 ADMIN' : '⭐ VIP'}
-                </span>
-              )}
             </div>
           ) : (
-            <button className="btn-cinema primary" onClick={() => setIsLoginModalOpen(true)}>
-              <LogIn size={16} /> Discord Girişi Yap
+            <button className="btn-primary" onClick={() => setIsLoginModalOpen(true)}>
+              <LogIn size={15} /> giriş yap
             </button>
           )}
         </div>
@@ -1179,15 +748,9 @@ export default function App() {
 
       {/* Main Body */}
       <div className="cinema-app-body" style={{ display: 'flex', position: 'relative' }}>
-        {/* Left Side: Cinema Movie Posters Billboard Panel */}
-        <MovieBillboardLeft
-          moviePosters={moviePosters}
-        />
-
-        {/* Büfe Stand Banner Image between Billboards and Auditorium Seats */}
+        <MovieBillboardLeft moviePosters={moviePosters} />
         <BufeStandSide onOpenBuffet={() => setIsBuffetModalOpen(true)} />
 
-        {/* Workspace: Screen + Auditorium */}
         <main className="cinema-hall-workspace" style={{ flex: 1 }}>
           <CinemaScreen
             ref={cinemaScreenRef}
@@ -1199,41 +762,26 @@ export default function App() {
             setBroadcasterPeerId={setBroadcasterPeerId}
             streamUrl={streamUrl}
             setStreamUrl={setStreamUrl}
+            onSetStreamUrl={handleSetStreamUrl}
+            isAdmin={isAdmin}
             currentUser={currentUser}
-            messages={messages}
-            userBadges={userBadges}
-            vipUsers={vipUsers}
             activeMola={activeMola}
-            onSendMessage={handleSendMessage}
-            onDeleteMessage={handleDeleteMessage}
           />
 
           <CinemaAuditorium
             seatedUsers={seatedUsers}
-            userSnacks={userSnacks}
-            vipUsers={vipUsers}
-            activeReactions={activeReactions}
             currentUser={currentUser}
             onSelectSeat={handleSelectSeat}
-            onOpenLoginModal={(seat) => { setTargetSeatCode(seat); setIsLoginModalOpen(true); }}
-            onOpenAdminModal={openAdminModal}
-          />
-
-          <InteractionsOverlay
-            activeReactions={activeReactions}
-            onTriggerReaction={handleTriggerReaction}
-            mySeatCode={Object.keys(seatedUsers).find(k => seatedUsers[k].id === currentUser?.id)}
-            mySnacks={mySnacks}
+            vipUsers={vipUsers}
+            userBadges={userBadges}
+            hiddenBadges={hiddenBadges}
+            userSnacks={userSnacks}
             onConsumePopcorn={handleConsumePopcorn}
-            onOpenBuffet={() => setIsBuffetModalOpen(true)}
-            onOpenMolaModal={() => setIsMolaModalOpen(true)}
-            activeMola={activeMola}
-            onEndMola={handleEndMola}
-            isAdmin={isAdmin}
           />
         </main>
 
-        {/* Discord Sidebar */}
+        <InteractionsOverlay reactions={activeReactions} />
+
         <DiscordSidebar
           messages={messages}
           onSendMessage={handleSendMessage}
@@ -1252,8 +800,8 @@ export default function App() {
       <footer style={{
         textAlign: 'center',
         padding: '12px 20px',
-        background: 'rgba(10, 4, 7, 0.95)',
-        borderTop: '1px solid var(--bg-card-border)',
+        background: '#121212',
+        borderTop: '1px solid var(--border-site)',
         fontSize: '0.8rem',
         color: 'var(--text-muted)',
         display: 'flex',
@@ -1282,15 +830,12 @@ export default function App() {
 
       <DiscordLoginModal
         isOpen={!currentUser && isLoginModalOpen}
-        onClose={() => {
-          if (currentUser) setIsLoginModalOpen(false);
-        }}
+        onClose={() => { if (currentUser) setIsLoginModalOpen(false); }}
         onLogin={handleLogin}
         tempDiscordUser={tempDiscordUser}
         currentUser={currentUser}
       />
 
-      {/* User Profile Settings Modal */}
       <UserProfileModal
         isOpen={isProfileModalOpen}
         onClose={() => setIsProfileModalOpen(false)}
@@ -1310,58 +855,45 @@ export default function App() {
         userCredits={userCredits}
         buffetItems={buffetItems}
         onBuySnack={handleBuySnack}
-        onAddBuffetItem={handleAddBuffetItem}
-        onDeleteBuffetItem={handleDeleteBuffetItem}
+        onAddBuffetItem={() => {}}
+        onDeleteBuffetItem={() => {}}
         isAdmin={isAdmin}
       />
 
       <MolaModal
         isOpen={isMolaModalOpen}
         onClose={() => setIsMolaModalOpen(false)}
-        onStartMola={handleStartMola}
+        activeMola={activeMola}
+        onStartMola={() => {}}
+        onEndMola={() => {}}
+        isAdmin={isAdmin}
       />
 
-      <AdminControlsModal
-        isOpen={isAdminModalOpen}
-        onClose={() => setIsAdminModalOpen(false)}
-        targetUser={adminModalUser}
-        currentSeatCode={adminModalSeat}
-        availableSeats={availableSeats}
-        onMoveUser={handleAdminMoveUser}
-        onKickUser={handleAdminKickUser}
-        onGrantCredits={handleGrantCredits}
-        onToggleVip={handleToggleVip}
-        isTargetVip={adminModalUser && (vipUsers[adminModalUser.id] || isAdminUser(adminModalUser))}
-        userBadges={userBadges}
-        onUpdateUserBadge={handleUpdateUserBadge}
-      />
-
-      {/* Master Top-Right Admin Panel Modal */}
       <AdminMasterPanelModal
         isOpen={isAdminMasterOpen}
         onClose={() => setIsAdminMasterOpen(false)}
         moviePosters={moviePosters}
-        onAddMoviePoster={handleAddMoviePoster}
-        onUpdateMoviePosters={handleUpdateMoviePosters}
-        onDeleteMoviePoster={handleDeleteMoviePoster}
+        onAddMoviePoster={() => {}}
+        onUpdateMoviePosters={() => {}}
+        onDeleteMoviePoster={() => {}}
         activeMola={activeMola}
-        onStartMola={handleStartMola}
-        onEndMola={handleEndMola}
+        onStartMola={() => {}}
+        onEndMola={() => {}}
         seatedUsers={seatedUsers}
         availableSeats={availableSeats}
         vipUsers={vipUsers}
         userBadges={userBadges}
-        onUpdateUserBadge={handleUpdateUserBadge}
-        onMoveUser={handleAdminMoveUser}
-        onKickUser={handleAdminKickUser}
-        onGrantCredits={handleGrantCredits}
-        onToggleVip={handleToggleVip}
+        onUpdateUserBadge={() => {}}
+        onMoveUser={() => {}}
+        onKickUser={() => {}}
+        onGrantCredits={() => {}}
+        onToggleVip={() => {}}
         buffetItems={buffetItems}
-        onAddBuffetItem={handleAddBuffetItem}
-        onUpdateBuffetItem={handleUpdateBuffetItem}
-        onDeleteBuffetItem={handleDeleteBuffetItem}
+        onAddBuffetItem={() => {}}
+        onUpdateBuffetItem={() => {}}
+        onDeleteBuffetItem={() => {}}
         creditSettings={creditSettings}
-        onUpdateCreditSettings={handleUpdateCreditSettings}
+        onUpdateCreditSettings={() => {}}
         isBroadcasting={!!broadcasterName || !!broadcasterPeerId || !!streamUrl}
         broadcasterName={broadcasterName}
         broadcasterPeerId={broadcasterPeerId}

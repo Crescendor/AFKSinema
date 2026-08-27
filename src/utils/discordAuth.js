@@ -14,9 +14,20 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  // Use registered /callback redirectUri for Discord OAuth App
   const redirectUri = window.location.origin + '/callback';
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
+};
+
+export const initiateDiscordLogin = () => {
+  window.location.href = getDiscordOAuthUrl();
+};
+
+export const logoutDiscord = () => {
+  localStorage.removeItem('afk_current_user');
+};
+
+export const checkDiscordAuthCallback = async () => {
+  return null;
 };
 
 export let discordActivitySdk = null;
@@ -34,7 +45,6 @@ export const initDiscordActivitySdk = async () => {
     discordActivitySdk = new DiscordSDK(DEFAULT_DISCORD_CLIENT_ID);
     await discordActivitySdk.ready();
 
-    // Authorize within Discord Embedded App SDK
     const { code } = await discordActivitySdk.commands.authorize({
       client_id: DEFAULT_DISCORD_CLIENT_ID,
       response_type: 'code',
@@ -55,7 +65,6 @@ export const initDiscordActivitySdk = async () => {
   }
 };
 
-// Exchange OAuth Code for Token via Cloudflare Edge API (/api/discord-token)
 export const exchangeCodeForUser = async (code) => {
   try {
     const redirectUri = window.location.origin + '/callback';
@@ -67,7 +76,6 @@ export const exchangeCodeForUser = async (code) => {
     });
 
     if (!tokenRes.ok) {
-      // Fallback try with root / redirect uri if registered
       const fallbackUri = window.location.origin + '/';
       const fallbackRes = await fetch('/api/discord-token', {
         method: 'POST',
@@ -89,7 +97,6 @@ export const exchangeCodeForUser = async (code) => {
   }
 };
 
-// Fetch real Discord profile using OAuth Bearer Token
 export const fetchDiscordUserProfile = async (token) => {
   try {
     const res = await fetch('https://discord.com/api/v10/users/@me', {
