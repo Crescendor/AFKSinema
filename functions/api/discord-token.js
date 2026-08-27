@@ -30,6 +30,7 @@ export async function onRequestPost(context) {
 
     const data = await response.json();
     return new Response(JSON.stringify(data), {
+      status: response.status,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' }
     });
   } catch (err) {

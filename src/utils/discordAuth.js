@@ -14,7 +14,7 @@ export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
   const redirectUri = window.location.origin + '/callback';
-  return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
+  return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify`;
 };
 
 export const initiateDiscordLogin = () => {
