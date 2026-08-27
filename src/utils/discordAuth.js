@@ -14,7 +14,7 @@ export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
   const redirectUri = window.location.origin + '/callback';
-  return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=identify`;
+  return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
 };
 
 export const initiateDiscordLogin = () => {
@@ -68,28 +68,24 @@ export const exchangeCodeForUser = async (code) => {
   try {
     const redirectUri = window.location.origin + '/callback';
 
-    const tokenRes = await fetch('/api/discord-token', {
+    const res = await fetch('/api/discord-login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, redirectUri })
     });
 
-    if (!tokenRes.ok) {
-      const fallbackUri = window.location.origin + '/';
-      const fallbackRes = await fetch('/api/discord-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, redirectUri: fallbackUri })
-      });
-      if (!fallbackRes.ok) throw new Error('Token değişimi başarısız');
-      const fallbackData = await fallbackRes.json();
-      return await fetchDiscordUserProfile(fallbackData.access_token);
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}));
+      console.error('Discord API Edge Login Error:', errData);
+      throw new Error(errData.error || 'Login failed');
     }
 
-    const tokenData = await tokenRes.json();
-    if (!tokenData.access_token) throw new Error('Access token alınamadı');
+    const data = await res.json();
+    if (data && data.success && data.user) {
+      return data.user;
+    }
 
-    return await fetchDiscordUserProfile(tokenData.access_token);
+    return null;
   } catch (err) {
     console.error('OAuth Code Exchange Error:', err);
     return null;
@@ -98,30 +94,20 @@ export const exchangeCodeForUser = async (code) => {
 
 export const fetchDiscordUserProfile = async (token) => {
   try {
-    const res = await fetch('https://discord.com/api/v10/users/@me', {
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+    const res = await fetch('/api/discord-login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ accessToken: token })
     });
 
     if (!res.ok) throw new Error('Discord profili alınamadı');
 
     const data = await res.json();
-    const avatarUrl = data.avatar
-      ? `https://cdn.discordapp.com/avatars/${data.id}/${data.avatar}.${data.avatar.startsWith('a_') ? 'gif' : 'png'}?size=128`
-      : `https://cdn.discordapp.com/embed/avatars/${parseInt(data.discriminator || '0') % 5}.png`;
+    if (data && data.success && data.user) {
+      return data.user;
+    }
 
-    const isAdmin = ADMIN_DISCORD_IDS.includes(data.id.toString());
-
-    return {
-      id: data.id,
-      username: data.global_name || data.username,
-      discriminator: data.discriminator || '0',
-      avatar: avatarUrl,
-      role: isAdmin ? 'VIP Admin Streamer' : 'Sinema İzleyicisi',
-      badge: isAdmin ? '👑 Admin' : '🎬 İzleyici',
-      isAdmin
-    };
+    return null;
   } catch (err) {
     console.error('Discord API Hatası:', err);
     return null;
