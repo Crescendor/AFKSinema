@@ -2,7 +2,6 @@
 import { DiscordSDK } from '@discord/embedded-app-sdk';
 
 export const ADMIN_DISCORD_IDS = [
-  '102225960337670144',
   '269639754675519489'
 ];
 
