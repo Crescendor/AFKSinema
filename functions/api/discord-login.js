@@ -15,8 +15,10 @@ export async function onRequestPost(context) {
     if (!token && code) {
       const urisToTry = [
         redirectUri,
+        'https://afksinema.pages.dev/sinema',
         'https://afksinema.pages.dev/callback',
         'https://afksinema.pages.dev/',
+        'http://localhost:5173/sinema',
         'http://localhost:5173/callback',
         'http://localhost:5173/'
       ].filter(Boolean);

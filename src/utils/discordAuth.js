@@ -13,7 +13,7 @@ export const isAdminUser = (user) => {
 export const DEFAULT_DISCORD_CLIENT_ID = '1410987724051320884';
 
 export const getDiscordOAuthUrl = (clientId = DEFAULT_DISCORD_CLIENT_ID) => {
-  const redirectUri = window.location.origin + '/callback';
+  const redirectUri = window.location.origin + '/sinema';
   return `https://discord.com/oauth2/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=identify`;
 };
 
@@ -66,7 +66,7 @@ export const initDiscordActivitySdk = async () => {
 
 export const exchangeCodeForUser = async (code) => {
   try {
-    const redirectUri = window.location.origin + '/callback';
+    const redirectUri = window.location.origin + '/sinema';
 
     const res = await fetch('/api/discord-login', {
       method: 'POST',
