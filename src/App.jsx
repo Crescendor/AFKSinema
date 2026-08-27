@@ -305,6 +305,46 @@ export default function App() {
     });
   }, []);
 
+  // Handle Discord OAuth Redirect Callback (?code=...)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const code = searchParams.get('code');
+    const hash = window.location.hash;
+
+    if (code) {
+      exchangeCodeForUser(code).then((profile) => {
+        if (profile) {
+          setCurrentUser(profile);
+          localStorage.setItem('afk_current_user', JSON.stringify(profile));
+          setIsLoginModalOpen(false);
+          setMessages(prev => [...prev, {
+            id: 'sys_' + Date.now(),
+            type: 'system',
+            text: `👑 ${profile.username} Discord hesabı ile başarıyla giriş yaptı!`
+          }]);
+        }
+        const roomCode = getRoomCodeFromLocation();
+        const newUrl = window.location.pathname + (roomCode ? `?room=${roomCode}` : '');
+        window.history.replaceState(null, '', newUrl);
+      });
+    } else if (hash && hash.includes('access_token')) {
+      const params = new URLSearchParams(hash.substring(1));
+      const token = params.get('access_token');
+      if (token) {
+        fetchDiscordUserProfile(token).then((profile) => {
+          if (profile) {
+            setCurrentUser(profile);
+            localStorage.setItem('afk_current_user', JSON.stringify(profile));
+            setIsLoginModalOpen(false);
+          }
+          const roomCode = getRoomCodeFromLocation();
+          const newUrl = window.location.pathname + (roomCode ? `?room=${roomCode}` : '');
+          window.history.replaceState(null, '', newUrl);
+        });
+      }
+    }
+  }, []);
+
   // Real-Time Multi-User Room Sync Polling
   useEffect(() => {
     if (!currentRoomCode) return;
