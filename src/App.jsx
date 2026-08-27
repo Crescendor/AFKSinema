@@ -675,16 +675,68 @@ export default function App() {
   // IF NO ROOM CODE SELECTED, RENDER DOXCARDS LANDING PAGE!
   if (!currentRoomCode) {
     return (
-      <LandingPage
-        currentUser={currentUser}
-        onLogin={handleLogin}
-        onLogout={handleLogout}
-        onCreateRoom={handleCreateRoom}
-        onJoinRoom={handleJoinRoom}
-        onOpenAdmin={() => setIsAdminMasterOpen(true)}
-        urlRoomCode={getRoomCodeFromLocation()}
-        isLoading={false}
-      />
+      <>
+        <LandingPage
+          currentUser={currentUser}
+          onLogin={handleLogin}
+          onLogout={handleLogout}
+          onCreateRoom={handleCreateRoom}
+          onJoinRoom={handleJoinRoom}
+          onOpenAdmin={() => setIsAdminMasterOpen(true)}
+          urlRoomCode={getRoomCodeFromLocation()}
+          isLoading={false}
+        />
+
+        <AdminMasterPanelModal
+          isOpen={isAdminMasterOpen}
+          onClose={() => setIsAdminMasterOpen(false)}
+          moviePosters={moviePosters}
+          onAddMoviePoster={() => {}}
+          onUpdateMoviePosters={() => {}}
+          onDeleteMoviePoster={() => {}}
+          activeMola={activeMola}
+          onStartMola={() => {}}
+          onEndMola={() => {}}
+          seatedUsers={seatedUsers}
+          availableSeats={availableSeats}
+          vipUsers={vipUsers}
+          userBadges={userBadges}
+          onUpdateUserBadge={() => {}}
+          onMoveUser={() => {}}
+          onKickUser={() => {}}
+          onGrantCredits={() => {}}
+          onToggleVip={() => {}}
+          buffetItems={buffetItems}
+          onAddBuffetItem={() => {}}
+          onUpdateBuffetItem={() => {}}
+          onDeleteBuffetItem={() => {}}
+          creditSettings={creditSettings}
+          onUpdateCreditSettings={() => {}}
+          isBroadcasting={!!broadcasterName || !!broadcasterPeerId || !!streamUrl}
+          broadcasterName={broadcasterName}
+          broadcasterPeerId={broadcasterPeerId}
+          onStartBroadcast={handleTriggerStartBroadcast}
+          onStopBroadcast={handleTriggerStopBroadcast}
+          streamUrl={streamUrl}
+          onSetStreamUrl={handleSetStreamUrl}
+          lightsDimmed={lightsDimmed}
+          onToggleLights={() => setLightsDimmed(!lightsDimmed)}
+        />
+
+        <DiscordLoginModal
+          isOpen={!currentUser && isLoginModalOpen}
+          onClose={() => { if (currentUser) setIsLoginModalOpen(false); }}
+          onLogin={handleLogin}
+          tempDiscordUser={tempDiscordUser}
+          currentUser={currentUser}
+        />
+
+        <LegalModal
+          isOpen={!!legalModalType}
+          type={legalModalType}
+          onClose={closeLegalModal}
+        />
+      </>
     );
   }
 
